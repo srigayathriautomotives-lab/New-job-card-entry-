@@ -1,11 +1,46 @@
-<div align="center">
+# Eicher Job Card & Spares Management
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+Standalone web application for Eicher tractor service operations, job cards, customers, complaints, staff, attendance and spares.
 
-  <h1>Built with AI Studio</h2>
+## Architecture
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+- React + Vite frontend
+- Express API backend
+- PostgreSQL database
+- Drizzle schema/migrations
+- Excel/CSV import and export
+- Optional Google Sheets synchronization
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
+The application is **not dependent on Google AI Studio or a Gemini API key**.
 
-</div>
+## Run locally
+
+1. Install Node.js 20+.
+2. Install dependencies:
+   `npm install`
+3. Create `.env` from `.env.example` and set `DATABASE_URL` to your PostgreSQL database.
+4. Start:
+   `npm run dev`
+5. Open `http://localhost:3000`.
+
+## Production
+
+Build:
+
+`npm run build`
+
+Start:
+
+`npm start`
+
+The Express server serves both the API and the built React application.
+
+## Database
+
+The server expects PostgreSQL through `DATABASE_URL`. The old Google AI Studio Cloud SQL fallback has been removed so the application can be deployed independently.
+
+Before first use, create/update the PostgreSQL schema using the project's Drizzle configuration/migration workflow.
+
+## Environment
+
+Do not commit `.env`, database passwords, API keys, or service-account credentials.
