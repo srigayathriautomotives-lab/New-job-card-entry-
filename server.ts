@@ -2,9 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
-import pg from 'pg';
-
-const { Pool } = pg;
+import { pool } from './src/db/index.ts';
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
@@ -13,26 +11,7 @@ app.use(cors());
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 
-let pool: any = null;
-
-function getPool(): any {
-  if (!pool) {
-    try {
-      if (process.env.DATABASE_URL) {
-        pool = new Pool({
-          connectionString: process.env.DATABASE_URL,
-        });
-      } else {
-        throw new Error('DATABASE_URL is missing');
-      }
-    } catch {
-      console.warn('DB not connected — mock active');
-      pool = {
-        query: async () => ({ rows: [] }),
-        connect: async () => ({ query: async () => ({ rows: [] }), release: () => {} })
-      };
-    }
-  }
+function getPool() {
   return pool;
 }
 
@@ -90,6 +69,217 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', time: new Date().toISOString() });
 });
 
+// Intelligent fuzzy field normalizer for Excel / CSV / JSON imports
+function normKey(str: any): string {
+  return String(str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function extractField(obj: any, candidates: string[]): string {
+  if (!obj || typeof obj !== 'object') return '';
+  const normalizedObj: Record<string, any> = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (v != null && String(v).trim() !== '') {
+      normalizedObj[normKey(k)] = String(v).trim();
+    }
+  }
+
+  // 1. Exact normalized candidate match
+  for (const c of candidates) {
+    const nc = normKey(c);
+    if (normalizedObj[nc] !== undefined && normalizedObj[nc] !== '') {
+      return normalizedObj[nc];
+    }
+  }
+
+  // 2. Substring matching in keys
+  for (const [k, v] of Object.entries(normalizedObj)) {
+    for (const c of candidates) {
+      const nc = normKey(c);
+      if (nc.length >= 3 && (k.includes(nc) || nc.includes(k)) && v !== '') {
+        return v;
+      }
+    }
+  }
+
+  return '';
+}
+
+// Extract customer object from any Excel / raw row format
+function normalizeCustomerRow(r: any, index: number, seenKeys: Set<string>) {
+  const chassisNo = extractField(r, [
+    'chassisNo', 'chassis_no', 'chassis', 'chassisnumber', 'chassisnum', 'chassiscode',
+    'vin', 'vinnumber', 'frameno', 'framenumber', 'tractorslno', 'tractorchassis',
+    'serialno', 'serialnumber', 'slno', 'sno', 'trchassis'
+  ]) || (r.chassisNo ? String(r.chassisNo).trim() : '');
+
+  const custName = extractField(r, [
+    'custName', 'cust_name', 'customername', 'nameofcustomer', 'name', 'ownername',
+    'farmername', 'clientname', 'partyname', 'customer', 'cust'
+  ]) || (r.custName ? String(r.custName).trim() : '');
+
+  const fatherName = extractField(r, [
+    'fatherName', 'father_name', 'father', 'fathersname', 'careof', 'co', 'so', 'wo', 'do',
+    'husbandname', 'parentname', 'guardian'
+  ]) || (r.fatherName ? String(r.fatherName).trim() : '');
+
+  const custAddr = extractField(r, [
+    'custAddr', 'cust_addr', 'address', 'customeraddress', 'fulladdress', 'location',
+    'residence', 'place', 'addr'
+  ]) || (r.custAddr ? String(r.custAddr).trim() : '');
+
+  const village = extractField(r, [
+    'village', 'vill', 'town', 'city', 'habitation', 'gramam', 'ooru'
+  ]) || (r.village ? String(r.village).trim() : '');
+
+  const mandal = extractField(r, [
+    'mandal', 'mandalname', 'taluk', 'tehsil', 'block', 'district', 'dist'
+  ]) || (r.mandal ? String(r.mandal).trim() : '');
+
+  const ownerMob = extractField(r, [
+    'ownerMob', 'owner_mob', 'mobile', 'mobilenumber', 'phone', 'phonenumber', 'contact',
+    'contactno', 'custphone', 'cell', 'cellno', 'phno', 'tel', 'phone1'
+  ]) || (r.ownerMob ? String(r.ownerMob).trim() : '');
+
+  const driverMob = extractField(r, [
+    'driverMob', 'driver_mob', 'driverphone', 'drivernumber', 'alternatemobile', 'altphone',
+    'altmobile', 'secondmobile', 'phone2', 'driver'
+  ]) || (r.driverMob ? String(r.driverMob).trim() : '');
+
+  const regdNo = extractField(r, [
+    'regdNo', 'regd_no', 'registrationno', 'regnumber', 'vehicleno', 'tractorregdno',
+    'regno', 'rcno', 'plateno'
+  ]) || (r.regdNo ? String(r.regdNo).trim() : '');
+
+  const engineNo = extractField(r, [
+    'engineNo', 'engine_no', 'enginenumber', 'engno', 'motorno'
+  ]) || (r.engineNo ? String(r.engineNo).trim() : '');
+
+  const tractorModel = extractField(r, [
+    'tractorModel', 'tractor_model', 'model', 'modeltype', 'modelname', 'variant',
+    'hp', 'horse_power', 'make', 'tractortype'
+  ]) || (r.tractorModel ? String(r.tractorModel).trim() : '');
+
+  const dateOfDelivery = extractField(r, [
+    'dateOfDelivery', 'date_of_delivery', 'deliverydate', 'installdate', 'doi', 'dop',
+    'purchasedate', 'saledate', 'invoicedate', 'billdate', 'dod', 'delivery_date', 'date'
+  ]) || (r.dateOfDelivery ? String(r.dateOfDelivery).trim() : '');
+
+  // Calculate unique chassisKey so NO row is ever skipped
+  let baseKey = normKey(chassisNo);
+  if (!baseKey) {
+    if (ownerMob) baseKey = `mob_${normKey(ownerMob)}`;
+    else if (regdNo) baseKey = `reg_${normKey(regdNo)}`;
+    else if (custName) baseKey = `name_${normKey(custName)}`;
+    else baseKey = `cust_row_${index + 1}`;
+  }
+
+  let finalKey = baseKey;
+  let counter = 1;
+  while (seenKeys.has(finalKey)) {
+    counter++;
+    finalKey = `${baseKey}_dup${counter}`;
+  }
+  seenKeys.add(finalKey);
+
+  let followupHistory = [];
+  try {
+    followupHistory = typeof r.followupHistory === 'string'
+      ? JSON.parse(r.followupHistory)
+      : (Array.isArray(r.followupHistory) ? r.followupHistory : (Array.isArray(r.followup_history) ? r.followup_history : []));
+  } catch {}
+
+  const fullData = r.full_data || r.fullData || {
+    ...r,
+    chassisNo,
+    custName,
+    fatherName,
+    custAddr: custAddr || (village ? (mandal ? `${village}, ${mandal}` : village) : ''),
+    village,
+    mandal,
+    ownerMob,
+    driverMob,
+    regdNo,
+    engineNo,
+    tractorModel,
+    dateOfDelivery,
+    __chassisDisplay: chassisNo,
+    __custNameDisplay: custName,
+    __custPhoneDisplay: ownerMob,
+    __custAddrDisplay: custAddr || village
+  };
+
+  return {
+    chassisKey: finalKey,
+    chassisNo: chassisNo || finalKey,
+    custName,
+    fatherName,
+    custAddr: custAddr || (village ? (mandal ? `${village}, ${mandal}` : village) : ''),
+    village,
+    mandal,
+    ownerMob,
+    driverMob,
+    regdNo,
+    engineNo,
+    tractorModel,
+    dateOfDelivery,
+    followupHistory: JSON.stringify(followupHistory),
+    fullData: JSON.stringify(fullData)
+  };
+}
+
+// Extract spare row from any Excel / raw format
+function normalizeSpareRow(r: any, index: number, seenKeys: Set<string>) {
+  const partNo = extractField(r, [
+    'partNo', 'part_no', 'partnumber', 'itemcode', 'sparepartno', 'spareno',
+    'partcode', 'materialno', 'itemnumber', 'part', 'code'
+  ]) || (r.partNo ? String(r.partNo).trim() : '');
+
+  const partDesc = extractField(r, [
+    'partDesc', 'part_desc', 'desc', 'description', 'partname', 'itemdesc',
+    'itemname', 'materialdescription', 'sparedesc', 'details', 'name'
+  ]) || (r.partDesc ? String(r.partDesc).trim() : '');
+
+  const mrp = extractField(r, [
+    'mrp', 'rate', 'price', 'amount', 'unitprice', 'cost', 'val', 'standardrate'
+  ]) || (r.mrp != null ? String(r.mrp).trim() : '');
+
+  const category = extractField(r, [
+    'category', 'group', 'type', 'partcategory', 'section', 'division'
+  ]) || (r.category ? String(r.category).trim() : '');
+
+  let baseKey = normKey(partNo);
+  if (!baseKey) {
+    if (partDesc) baseKey = `desc_${normKey(partDesc).substring(0, 20)}`;
+    else baseKey = `part_row_${index + 1}`;
+  }
+
+  let finalKey = baseKey;
+  let counter = 1;
+  while (seenKeys.has(finalKey)) {
+    counter++;
+    finalKey = `${baseKey}_dup${counter}`;
+  }
+  seenKeys.add(finalKey);
+
+  const fullData = r.full_data || r.fullData || {
+    ...r,
+    partNo,
+    partDesc,
+    mrp,
+    category,
+    __partNoDisplay: partNo
+  };
+
+  return {
+    partKey: finalKey,
+    partNo: partNo || finalKey,
+    partDesc,
+    mrp,
+    category,
+    fullData: JSON.stringify(fullData)
+  };
+}
+
 // =======================
 // CUSTOMERS API
 // =======================
@@ -113,6 +303,10 @@ app.post('/api/customers/bulk', async (req, res) => {
     return res.status(400).json({ success: false, error: 'Rows array required' });
   }
 
+  if (rows.length === 0) {
+    return res.json({ success: true, count: 0 });
+  }
+
   const client = await getPool().connect();
   try {
     await client.query('BEGIN');
@@ -120,6 +314,9 @@ app.post('/api/customers/bulk', async (req, res) => {
     if (replaceAll) {
       await client.query('DELETE FROM customers');
     }
+
+    const seenKeys = new Set<string>();
+    const normalizedRows = rows.map((r, i) => normalizeCustomerRow(r, i, seenKeys));
 
     const insertQuery = `
       INSERT INTO customers (
@@ -145,34 +342,35 @@ app.post('/api/customers/bulk', async (req, res) => {
         updated_at = NOW()
     `;
 
-    for (const r of rows) {
-      const chassisKey = r.chassisKey || r.chassis_key || r.key || (r.chassisNo ? String(r.chassisNo).toLowerCase().replace(/[^a-z0-9]/g, '') : null);
-      if (!chassisKey) continue;
-
-      const chassisNo = r.chassisNo || r.chassis_no || '';
-      const custName = r.custName || r.cust_name || r['cutomer name'] || r['Customer Name'] || '';
-      const fatherName = r.fatherName || r.father_name || r.father || '';
-      const custAddr = r.custAddr || r.cust_addr || r.address || '';
-      const village = r.village || '';
-      const mandal = r.mandal || '';
-      const ownerMob = r.ownerMob || r.owner_mob || r.phone || r['ph no'] || '';
-      const driverMob = r.driverMob || r.driver_mob || '';
-      const regdNo = r.regdNo || r.regd_no || '';
-      const engineNo = r.engineNo || r.engine_no || '';
-      const tractorModel = r.tractorModel || r.tractor_model || r.model || '';
-      const dateOfDelivery = r.dateOfDelivery || r.date_of_delivery || '';
-      const followupHistory = JSON.stringify(r.followupHistory || r.followup_history || []);
-      const fullData = JSON.stringify(r.fullData || r.full_data || r);
-
-      await client.query(insertQuery, [
-        chassisKey, chassisNo, custName, fatherName, custAddr, village, mandal,
-        ownerMob, driverMob, regdNo, engineNo, tractorModel, dateOfDelivery,
-        followupHistory, fullData
-      ]);
+    // Process in parallel batches of 50 for rapid upload speed
+    const batchSize = 50;
+    for (let i = 0; i < normalizedRows.length; i += batchSize) {
+      const chunk = normalizedRows.slice(i, i + batchSize);
+      await Promise.all(
+        chunk.map((item) =>
+          client.query(insertQuery, [
+            item.chassisKey,
+            item.chassisNo,
+            item.custName,
+            item.fatherName,
+            item.custAddr,
+            item.village,
+            item.mandal,
+            item.ownerMob,
+            item.driverMob,
+            item.regdNo,
+            item.engineNo,
+            item.tractorModel,
+            item.dateOfDelivery,
+            item.followupHistory,
+            item.fullData
+          ])
+        )
+      );
     }
 
     await client.query('COMMIT');
-    res.json({ success: true, count: rows.length });
+    res.json({ success: true, count: normalizedRows.length });
   } catch (error: any) {
     await client.query('ROLLBACK');
     console.error('Error saving customers bulk:', error);
@@ -182,13 +380,28 @@ app.post('/api/customers/bulk', async (req, res) => {
   }
 });
 
+// Delete all customers
+app.post('/api/database/delete-all-customers', async (req, res) => {
+  const client = await getPool().connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('DELETE FROM customers');
+    await client.query('COMMIT');
+    res.json({ success: true, message: 'All customers deleted successfully' });
+  } catch (error: any) {
+    await client.query('ROLLBACK');
+    console.error('Error deleting all customers:', error);
+    res.status(500).json({ success: false, error: 'Database error' });
+  } finally {
+    client.release();
+  }
+});
+
 // Upsert single customer
 app.post('/api/customers', async (req, res) => {
   const r = req.body;
-  const chassisKey = r.chassisKey || r.chassis_key || (r.chassisNo ? String(r.chassisNo).toLowerCase().replace(/[^a-z0-9]/g, '') : null);
-  if (!chassisKey) {
-    return res.status(400).json({ success: false, error: 'Valid chassis number is required' });
-  }
+  const seenKeys = new Set<string>();
+  const item = normalizeCustomerRow(r, 0, seenKeys);
 
   try {
     const client = getPool();
@@ -217,21 +430,21 @@ app.post('/api/customers', async (req, res) => {
       RETURNING *;
     `;
     const result = await client.query(query, [
-      chassisKey,
-      r.chassisNo || '',
-      r.custName || '',
-      r.fatherName || '',
-      r.custAddr || '',
-      r.village || '',
-      r.mandal || '',
-      r.ownerMob || '',
-      r.driverMob || '',
-      r.regdNo || '',
-      r.engineNo || '',
-      r.tractorModel || '',
-      r.dateOfDelivery || '',
-      JSON.stringify(r.followupHistory || []),
-      JSON.stringify(r.fullData || r)
+      item.chassisKey,
+      item.chassisNo,
+      item.custName,
+      item.fatherName,
+      item.custAddr,
+      item.village,
+      item.mandal,
+      item.ownerMob,
+      item.driverMob,
+      item.regdNo,
+      item.engineNo,
+      item.tractorModel,
+      item.dateOfDelivery,
+      item.followupHistory,
+      item.fullData
     ]);
     res.json({ success: true, data: result.rows[0] });
   } catch (error: any) {
@@ -263,6 +476,10 @@ app.post('/api/spares/bulk', async (req, res) => {
     return res.status(400).json({ success: false, error: 'Rows array required' });
   }
 
+  if (rows.length === 0) {
+    return res.json({ success: true, count: 0 });
+  }
+
   const client = await getPool().connect();
   try {
     await client.query('BEGIN');
@@ -270,6 +487,9 @@ app.post('/api/spares/bulk', async (req, res) => {
     if (replaceAll) {
       await client.query('DELETE FROM spares');
     }
+
+    const seenKeys = new Set<string>();
+    const normalizedRows = rows.map((r, i) => normalizeSpareRow(r, i, seenKeys));
 
     const insertQuery = `
       INSERT INTO spares (
@@ -284,21 +504,25 @@ app.post('/api/spares/bulk', async (req, res) => {
         updated_at = NOW()
     `;
 
-    for (const r of rows) {
-      const partKey = r.partKey || r.part_key || (r.partNo ? String(r.partNo).toLowerCase().replace(/[^a-z0-9]/g, '') : null);
-      if (!partKey) continue;
-
-      const partNo = r.partNo || r.part_no || '';
-      const partDesc = r.partDesc || r.part_desc || r.desc || r.description || '';
-      const mrp = r.mrp != null ? String(r.mrp) : '';
-      const category = r.category || '';
-      const fullData = JSON.stringify(r.fullData || r.full_data || r);
-
-      await client.query(insertQuery, [partKey, partNo, partDesc, mrp, category, fullData]);
+    const batchSize = 50;
+    for (let i = 0; i < normalizedRows.length; i += batchSize) {
+      const chunk = normalizedRows.slice(i, i + batchSize);
+      await Promise.all(
+        chunk.map((item) =>
+          client.query(insertQuery, [
+            item.partKey,
+            item.partNo,
+            item.partDesc,
+            item.mrp,
+            item.category,
+            item.fullData
+          ])
+        )
+      );
     }
 
     await client.query('COMMIT');
-    res.json({ success: true, count: rows.length });
+    res.json({ success: true, count: normalizedRows.length });
   } catch (error: any) {
     await client.query('ROLLBACK');
     console.error('Error saving spares bulk:', error);
