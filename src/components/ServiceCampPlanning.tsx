@@ -46,6 +46,7 @@ import { apiSaveServiceCamp, apiDeleteServiceCamp } from '../api';
 import { VillageCustomerInline } from './VillageCustomerInline';
 import { BroadcastQueueModal } from './BroadcastQueueModal';
 import { KrishnaDistrictRouteMap } from './KrishnaDistrictRouteMap';
+import { GeoSetup } from './GeoSetup';
 import { masterGeoDirectory } from '../lib/geoMatcher';
 
 export interface ServiceCamp {
@@ -91,8 +92,8 @@ export const ServiceCampPlanning: React.FC<ServiceCampPlanningProps> = ({
 }) => {
   const isTe = language === 'te';
 
-  // Navigation main tab: 'planning' (Villages Tree/Table), 'camps_list' (Scheduled Camps), or 'district_map' (Krishna & NTR District Route Map)
-  const [activeTab, setActiveTab] = useState<'planning' | 'camps_list' | 'district_map'>('planning');
+  // Navigation main tab: 'planning' (Villages Tree/Table), 'camps_list' (Scheduled Camps), 'district_map', or 'setup'
+  const [activeTab, setActiveTab] = useState<'planning' | 'camps_list' | 'district_map' | 'setup'>('planning');
 
   // View style inside planning: compact tree vs flat table
   const [viewStyle, setViewStyle] = useState<'tree' | 'table'>('tree');
@@ -294,9 +295,9 @@ export const ServiceCampPlanning: React.FC<ServiceCampPlanningProps> = ({
     const map: Record<string, any[]> = {};
 
     customers.forEach(c => {
-      const rawV = c.village || c.custAddr || '';
-      const rawM = c.mandal || '';
-      const rawAddr = c.custAddr || c.address || '';
+      const rawV = c.village || c.custAddr || c.address || c.VILLAGE || c["Town/Village"] || '';
+      const rawM = c.mandal || c.MANDAL || '';
+      const rawAddr = c.custAddr || c.address || c.address1 || '';
 
       // Match using Google Maps & Dealership master directory engine
       const match = masterGeoDirectory.matchLocation(rawV, rawM, rawAddr);
@@ -306,8 +307,15 @@ export const ServiceCampPlanning: React.FC<ServiceCampPlanningProps> = ({
         (Boolean(rawM) && normalizeGeoStr(match.mandalName) !== normalizeGeoStr(rawM))
       );
 
+      const custName = c.custName || c.customerName || c.cust_name || c.customer_name || c.Name || c.name || c.__custNameDisplay || '';
+      const ownerMob = c.ownerMob || c.mobileNumber || c.owner_mob || c.mobile_number || c.phone || c.phNo || c.Phone || c.__custPhoneDisplay || '';
+
       const enrichedCust = {
         ...c,
+        custName,
+        customerName: custName,
+        ownerMob,
+        mobileNumber: ownerMob,
         _geoMatch: match,
         _canonicalVillage: match.villageName,
         _canonicalMandal: match.mandalName,
@@ -355,19 +363,32 @@ export const ServiceCampPlanning: React.FC<ServiceCampPlanningProps> = ({
     const vKey = normalizeGeoStr(villageName);
     let list = customersByLocation[vKey] || [];
 
-    if (list.length === 0 && villageName.length > 3) {
-      const sub = vKey.substring(0, Math.min(vKey.length, 6));
-      for (const [k, vCusts] of Object.entries(customersByLocation)) {
-        if (!k.startsWith('mandal_') && (k.includes(sub) || sub.includes(k))) {
-          list = list.concat(vCusts);
+    if (mandalName) {
+      const mKey = `mandal_${normalizeGeoStr(mandalName)}`;
+      const mandalCusts = customersByLocation[mKey] || [];
+      const vLower = villageName.toLowerCase();
+      mandalCusts.forEach(c => {
+        const cVillage = (c.village || c.custAddr || c.address || c._originalVillage || '').toLowerCase();
+        if (cVillage.includes(vLower) || vLower.includes(cVillage)) {
+          if (!list.includes(c)) list.push(c);
         }
-      }
+      });
+    }
+
+    if (list.length === 0 && villageName.length > 2) {
+      const vLower = villageName.toLowerCase();
+      customers.forEach(c => {
+        const cVillage = (c.village || c.custAddr || c.address || c._originalVillage || '').toLowerCase();
+        if (cVillage.includes(vLower) || vLower.includes(cVillage)) {
+          if (!list.includes(c)) list.push(c);
+        }
+      });
     }
 
     // Deduplicate by chassisKey or chassisNo or id or mobile
     const uniqueMap = new Map();
     list.forEach(c => {
-      const key = c.chassisKey || c.chassisNo || c.id || `${c.custName}_${c.ownerMob || c.phone}`;
+      const key = c.chassisKey || c.chassisNo || c.id || `${c.custName || c.customerName}_${c.ownerMob || c.mobileNumber}`;
       if (key && !uniqueMap.has(key)) {
         uniqueMap.set(key, c);
       }
@@ -893,6 +914,16 @@ export const ServiceCampPlanning: React.FC<ServiceCampPlanningProps> = ({
               >
                 <MapPin className="w-3.5 h-3.5 text-rose-500" />
                 <span>{isTe ? 'రూట్ & దూరాల మ్యాప్' : 'Route & Distance Map'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('setup')}
+                className={`px-3 py-1 rounded-md text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                  activeTab === 'setup' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-300 hover:text-white'
+                }`}
+              >
+                <Building2 className="w-3.5 h-3.5" />
+                <span>{isTe ? 'సెటప్' : 'Setup'}</span>
               </button>
             </div>
 
@@ -1880,6 +1911,17 @@ export const ServiceCampPlanning: React.FC<ServiceCampPlanningProps> = ({
               dealershipCode: dealershipCode
             });
           }}
+        />
+      )}
+
+      {/* ========================================================================= */}
+      {/* 4. GEOGRAPHIC SETUP VIEW (Mandal/Village Management) */}
+      {/* ========================================================================= */}
+      {activeTab === 'setup' && (
+        <GeoSetup
+          dealershipData={DEALERSHIP_DATA}
+          isTe={isTe}
+          onUpdateData={() => alert('Persistence of geographic changes will be handled in a future update.')}
         />
       )}
 

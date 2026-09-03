@@ -171,6 +171,7 @@ export const translations = {
   // Master Databases & Sync
   masterTitle: { te: 'మాస్టర్ డేటాబేస్ & క్లౌడ్ బ్యాకప్ మేనేజ్‌మెంట్', en: 'Master Database & Cloud Backup Management' },
   customerMaster: { te: 'కస్టమర్ మాస్టర్ డేటా', en: 'Customer Master Data' },
+  customerDetails: { te: 'కస్టమర్ వివరాలు', en: 'Customer Details' },
   sparesMaster: { te: 'స్పేర్స్ మాస్టర్ డేటా', en: 'Spares Master Data' },
   importCustomerExcel: { te: 'కస్టమర్ ఎక్సెల్ ఫైల్ అప్‌లోడ్ (Import)', en: 'Import Customer Excel File' },
   importSparesExcel: { te: 'స్పేర్స్ ఎక్సెల్ ఫైల్ అప్‌లోడ్ (Import)', en: 'Import Spares Excel File' },

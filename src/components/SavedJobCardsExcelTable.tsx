@@ -86,8 +86,8 @@ export const SavedJobCardsExcelTable: React.FC<SavedJobCardsExcelTableProps> = (
   const [pageSize, setPageSize] = useState<number>(25);
 
   // Sorting
-  const [sortCol, setSortCol] = useState<string>("complaintDate");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [sortCol, setSortCol] = useState<string>("actualClosedDate");
+  const [sortDir, setSortDir] = useState<"desc" | "asc">("desc");
 
   // Column Filters State: Record<columnKey, Set<string>>
   const [columnFilters, setColumnFilters] = useState<Record<string, string[]>>({});
@@ -1055,44 +1055,28 @@ export const SavedJobCardsExcelTable: React.FC<SavedJobCardsExcelTableProps> = (
                         </td>
 
                         {/* 3. Tractor Details (Box 3) - DISPLAY ONLY */}
-                        <td className={`${cellPadding} border-r border-slate-200 align-top min-w-[240px]`}>
-                          <div className="space-y-1.5 p-1 bg-amber-50/40 rounded-lg border border-amber-200/60 text-left">
+                        <td className={`${cellPadding} border-r border-slate-200 align-top min-w-[180px]`}>
+                          <div className="space-y-1 p-0.5 bg-amber-50/30 rounded-md border border-amber-100 text-left">
                             {/* Tractor Model */}
-                            <div className="bg-white p-1 rounded border border-amber-100 shadow-2xs flex flex-col">
-                              <span className="text-[8.5px] font-bold text-amber-800 uppercase tracking-wider">{isTe ? "ట్రాక్టర్ మోడల్" : "Tractor Model"}</span>
-                              <span className="text-[11px] font-extrabold text-slate-900 truncate">
+                            <div className="bg-white p-0.5 rounded border border-amber-50 shadow-3xs flex flex-col">
+                              <span className="text-[7.5px] font-bold text-amber-800 uppercase tracking-wider">{isTe ? "మోడల్" : "Model"}</span>
+                              <span className="text-[10px] font-extrabold text-slate-900 truncate">
                                 🚜 {card.model || "—"}
                               </span>
                             </div>
 
-                            {/* Model Type */}
-                            <div className="bg-white p-1 rounded border border-amber-100 shadow-2xs flex flex-col">
-                              <span className="text-[8.5px] font-bold text-amber-800 uppercase tracking-wider">{isTe ? "మోడల్ రకం" : "Model Type"}</span>
-                              <span className="text-[11px] font-bold text-slate-700 truncate">
-                                ⚙️ {card.modelType || "—"}
-                              </span>
-                            </div>
-
                             {/* Chassis No */}
-                            <div className="bg-white p-1 rounded border border-amber-100 shadow-2xs flex flex-col">
-                              <span className="text-[8.5px] font-bold text-amber-800 uppercase tracking-wider">{isTe ? "ఛాసిస్ నెం." : "Chassis No"}</span>
-                              <span className="text-[11px] font-mono font-bold text-indigo-950 truncate">
+                            <div className="bg-white p-0.5 rounded border border-amber-50 shadow-3xs flex flex-col">
+                              <span className="text-[7.5px] font-bold text-amber-800 uppercase tracking-wider">{isTe ? "ఛాసిస్" : "Chassis"}</span>
+                              <span className="text-[10px] font-mono font-bold text-indigo-950 truncate">
                                 🆔 {card.chassisNo || "—"}
                               </span>
                             </div>
 
-                            {/* Engine No */}
-                            <div className="bg-white p-1 rounded border border-amber-100 shadow-2xs flex flex-col">
-                              <span className="text-[8.5px] font-bold text-amber-800 uppercase tracking-wider">{isTe ? "ఇంజన్ నెం." : "Engine No"}</span>
-                              <span className="text-[11px] font-mono font-semibold text-slate-700 truncate">
-                                🔌 {card.engineNo || "—"}
-                              </span>
-                            </div>
-
                             {/* Delivery Date */}
-                            <div className="bg-white p-1 rounded border border-amber-100 shadow-2xs flex flex-col">
-                              <span className="text-[8.5px] font-bold text-amber-800 uppercase tracking-wider">{isTe ? "డెలివరీ తేదీ" : "Delivery Date"}</span>
-                              <span className="text-[11px] font-semibold text-slate-700">
+                            <div className="bg-white p-0.5 rounded border border-amber-50 shadow-3xs flex flex-col">
+                              <span className="text-[7.5px] font-bold text-amber-800 uppercase tracking-wider">{isTe ? "డెలివరీ" : "DOD"}</span>
+                              <span className="text-[10px] font-semibold text-slate-700">
                                 📅 {formatDate(card.dateOfDelivery || card.installDate)}
                               </span>
                             </div>
@@ -1100,92 +1084,92 @@ export const SavedJobCardsExcelTable: React.FC<SavedJobCardsExcelTableProps> = (
                         </td>
 
                         {/* 4. Service & Repairs (Box 4) - EDITABLE */}
-                        <td className={`${cellPadding} border-r border-slate-200 align-top min-w-[250px]`}>
-                          <div className="space-y-1.5 p-1 bg-emerald-50/40 rounded-lg border border-emerald-200/60 text-left">
+                        <td className={`${cellPadding} border-r border-slate-200 align-top min-w-[180px]`}>
+                          <div className="space-y-1 p-0.5 bg-emerald-50/30 rounded-md border border-emerald-100 text-left">
                             {/* Hour Meter */}
-                            <div className="flex items-center gap-1 bg-white p-1 rounded border border-emerald-100 shadow-2xs">
-                              <span className="text-[9px] font-extrabold text-emerald-900 w-16 shrink-0">{isTe ? "గంటలు:" : "Hrs Run:"}</span>
+                            <div className="flex items-center gap-1 bg-white p-0.5 rounded border border-emerald-50 shadow-3xs">
+                              <span className="text-[8px] font-extrabold text-emerald-900 w-12 shrink-0 uppercase">{isTe ? "గంటలు:" : "Hrs:"}</span>
                               <input
                                 type="number"
                                 value={getRowValue(card, "hourMeter") !== undefined ? getRowValue(card, "hourMeter") : (card.hourMeter || card.hrsRun || "")}
                                 onChange={(e) => handleRowFieldChange(card.id, "hourMeter", e.target.value)}
-                                className="text-[11px] font-mono font-bold text-slate-800 bg-transparent border-0 p-0 focus:ring-0 focus:outline-none w-full"
+                                className="text-[10px] font-mono font-bold text-slate-800 bg-transparent border-0 p-0 focus:ring-0 focus:outline-none w-full"
                               />
                             </div>
 
                             {/* Service Type */}
-                            <div className="flex items-center gap-1 bg-white p-1 rounded border border-emerald-100 shadow-2xs">
-                              <span className="text-[9px] font-extrabold text-emerald-900 w-16 shrink-0">{isTe ? "సర్వీస్ రకం:" : "Service Type:"}</span>
+                            <div className="flex items-center gap-1 bg-white p-0.5 rounded border border-emerald-50 shadow-3xs">
+                              <span className="text-[8px] font-extrabold text-emerald-900 w-12 shrink-0 uppercase">{isTe ? "రకం:" : "Type:"}</span>
                               <select
                                 value={getRowValue(card, "serviceType")}
                                 onChange={(e) => handleRowFieldChange(card.id, "serviceType", e.target.value)}
-                                className="text-[11px] font-bold text-slate-800 bg-transparent border-0 p-0 focus:ring-0 focus:outline-none w-full cursor-pointer"
+                                className="text-[10px] font-bold text-slate-800 bg-transparent border-0 p-0 focus:ring-0 focus:outline-none w-full cursor-pointer"
                               >
                                 <option value="">-- select --</option>
                                 {serviceTypes.map((st) => (
-                                  <option key={st} value={st}>{st}</option>
+                                  <option key={`st-opt-${card.id}-${st}`} value={st}>{st}</option>
                                 ))}
                               </select>
                             </div>
 
                             {/* Free Service List */}
-                            <div className="flex items-center gap-1 bg-white p-1 rounded border border-emerald-100 shadow-2xs">
-                              <span className="text-[9px] font-extrabold text-emerald-900 w-16 shrink-0">{isTe ? "ఫ్రీ సర్వీస్:" : "Free Serv:"}</span>
+                            <div className="flex items-center gap-1 bg-white p-0.5 rounded border border-emerald-50 shadow-3xs">
+                              <span className="text-[8px] font-extrabold text-emerald-900 w-12 shrink-0 uppercase">{isTe ? "ఫ్రీ:" : "Free:"}</span>
                               <input
                                 type="text"
                                 value={getRowValue(card, "freeServiceList")}
                                 onChange={(e) => handleRowFieldChange(card.id, "freeServiceList", e.target.value)}
-                                className="text-[11px] font-bold text-slate-800 bg-transparent border-0 p-0 focus:ring-0 focus:outline-none w-full"
+                                className="text-[10px] font-bold text-slate-800 bg-transparent border-0 p-0 focus:ring-0 focus:outline-none w-full"
                               />
                             </div>
 
                             {/* Extra Repairs */}
-                            <div className="flex items-center gap-1 bg-white p-1 rounded border border-emerald-100 shadow-2xs">
-                              <span className="text-[9px] font-extrabold text-emerald-900 w-16 shrink-0">{isTe ? "రిపేర్లు:" : "Repairs:"}</span>
+                            <div className="flex items-center gap-1 bg-white p-0.5 rounded border border-emerald-50 shadow-3xs">
+                              <span className="text-[8px] font-extrabold text-emerald-900 w-12 shrink-0 uppercase">{isTe ? "రిపేర్లు:" : "Repairs:"}</span>
                               <input
                                 type="text"
                                 value={getRowValue(card, "extraRepairs") !== undefined ? getRowValue(card, "extraRepairs") : (card.extraRepairs || card.problemDescription || "")}
                                 onChange={(e) => handleRowFieldChange(card.id, "extraRepairs", e.target.value)}
-                                className="text-[11px] font-bold text-slate-800 bg-transparent border-0 p-0 focus:ring-0 focus:outline-none w-full"
+                                className="text-[10px] font-bold text-slate-800 bg-transparent border-0 p-0 focus:ring-0 focus:outline-none w-full"
                               />
                             </div>
 
                             {/* Grand Total */}
-                            <div className="flex items-center gap-1 bg-white p-1 rounded border border-emerald-100 shadow-2xs">
-                              <span className="text-[9px] font-extrabold text-emerald-900 w-16 shrink-0">{isTe ? "బిల్ (₹):" : "Bill (₹):"}</span>
+                            <div className="flex items-center gap-1 bg-white p-0.5 rounded border border-emerald-50 shadow-3xs">
+                              <span className="text-[8px] font-extrabold text-emerald-900 w-12 shrink-0 uppercase">{isTe ? "బిల్ (₹):" : "Bill (₹):"}</span>
                               <input
                                 type="number"
                                 value={getRowValue(card, "gTotal")}
                                 onChange={(e) => handleRowFieldChange(card.id, "gTotal", e.target.value)}
-                                className="text-[11px] font-bold text-emerald-950 bg-transparent border-0 p-0 focus:ring-0 focus:outline-none w-full"
+                                className="text-[10px] font-bold text-emerald-950 bg-transparent border-0 p-0 focus:ring-0 focus:outline-none w-full"
                               />
                             </div>
                           </div>
                         </td>
 
                         {/* 5. Closure & Technician (Box 5) - EDITABLE */}
-                        <td className={`${cellPadding} border-r border-slate-200 align-top min-w-[260px]`}>
-                          <div className="space-y-1.5 p-1 bg-purple-50/40 rounded-lg border border-purple-200/60 text-left">
+                        <td className={`${cellPadding} border-r border-slate-200 align-top min-w-[180px]`}>
+                          <div className="space-y-1 p-0.5 bg-purple-50/30 rounded-md border border-purple-100 text-left">
                             {/* Actual Closed Date */}
-                            <div className="flex items-center gap-1 bg-white p-1 rounded border border-purple-100 shadow-2xs">
-                              <span className="text-[9px] font-extrabold text-purple-900 w-16 shrink-0">{isTe ? "క్లోజ్ తేదీ:" : "Closed Date:"}</span>
+                            <div className="flex items-center gap-1 bg-white p-0.5 rounded border border-purple-100 shadow-3xs">
+                              <span className="text-[8px] font-extrabold text-purple-900 w-12 shrink-0 uppercase">{isTe ? "క్లోజ్:" : "Closed:"}</span>
                               <input
                                 type="date"
                                 value={toInputDate(getRowValue(card, "actualClosedDate") !== undefined ? getRowValue(card, "actualClosedDate") : (card.actualClosedDate || card.dateTimeOut))}
                                 onChange={(e) => handleRowFieldChange(card.id, "actualClosedDate", e.target.value)}
-                                className="text-[11px] font-bold text-slate-800 bg-transparent border-0 p-0 focus:ring-0 focus:outline-none w-full"
+                                className="text-[10px] font-bold text-slate-800 bg-transparent border-0 p-0 focus:ring-0 focus:outline-none w-full"
                               />
                             </div>
 
                             {/* Mechanic */}
-                            <div className="flex items-center gap-1 bg-white p-1 rounded border border-purple-100 shadow-2xs">
-                              <span className="text-[9px] font-extrabold text-purple-900 w-16 shrink-0">{isTe ? "టెక్నీషియన్:" : "Technician:"}</span>
+                            <div className="flex items-center gap-1 bg-white p-0.5 rounded border border-purple-50 shadow-3xs">
+                              <span className="text-[8px] font-extrabold text-purple-900 w-12 shrink-0 uppercase">{isTe ? "మెకానిక్:" : "Mech:"}</span>
                               <input
                                 type="text"
                                 list={`excel-mech-list-${card.id}`}
                                 value={getRowValue(card, "mechanic")}
                                 onChange={(e) => handleRowFieldChange(card.id, "mechanic", e.target.value)}
-                                className="text-[11px] font-bold text-slate-800 bg-transparent border-0 p-0 focus:ring-0 focus:outline-none w-full"
+                                className="text-[10px] font-bold text-slate-800 bg-transparent border-0 p-0 focus:ring-0 focus:outline-none w-full"
                               />
                               <datalist id={`excel-mech-list-${card.id}`}>
                                 {Array.from(new Set(mechanicsList || [])).map((m, idx) => (
@@ -1195,50 +1179,39 @@ export const SavedJobCardsExcelTable: React.FC<SavedJobCardsExcelTableProps> = (
                             </div>
 
                             {/* Service Location */}
-                            <div className="flex items-center gap-1 bg-white p-1 rounded border border-purple-100 shadow-2xs">
-                              <span className="text-[9px] font-extrabold text-purple-900 w-16 shrink-0">{isTe ? "స్థలం:" : "Location:"}</span>
+                            <div className="flex items-center gap-1 bg-white p-0.5 rounded border border-purple-100 shadow-3xs">
+                              <span className="text-[8px] font-extrabold text-purple-900 w-12 shrink-0 uppercase">{isTe ? "స్థలం:" : "Loc:"}</span>
                               <select
                                 value={getRowValue(card, "serviceLocation")}
                                 onChange={(e) => handleRowFieldChange(card.id, "serviceLocation", e.target.value)}
-                                className="text-[11px] font-bold text-slate-800 bg-transparent border-0 p-0 focus:ring-0 focus:outline-none w-full cursor-pointer"
+                                className="text-[10px] font-bold text-slate-800 bg-transparent border-0 p-0 focus:ring-0 focus:outline-none w-full cursor-pointer"
                               >
-                                <option value="workshop">🏭 {isTe ? "వర్క్‌షాప్" : "Workshop"}</option>
-                                <option value="doorstep">🚜 {isTe ? "రైతు ఇంటి వద్ద" : "Doorstep"}</option>
-                                <option value="field">🌾 {isTe ? "ఫీల్డ్" : "Field"}</option>
-                                <option value="camp">⛺ {isTe ? "క్యాంప్" : "Camp"}</option>
+                                <option value="workshop">🏭 {isTe ? "WS" : "WS"}</option>
+                                <option value="doorstep">🚜 {isTe ? "DS" : "DS"}</option>
+                                <option value="field">🌾 {isTe ? "FLD" : "FLD"}</option>
+                                <option value="camp">⛺ {isTe ? "CMP" : "CMP"}</option>
                               </select>
                             </div>
 
                             {/* Bill No */}
-                            <div className="flex items-center gap-1 bg-white p-1 rounded border border-purple-100 shadow-2xs">
-                              <span className="text-[9px] font-extrabold text-purple-900 w-16 shrink-0">{isTe ? "బిల్ నెం:" : "Bill No:"}</span>
+                            <div className="flex items-center gap-1 bg-white p-0.5 rounded border border-purple-100 shadow-3xs">
+                              <span className="text-[8px] font-extrabold text-purple-900 w-12 shrink-0 uppercase">{isTe ? "బిల్:" : "Bill:"}</span>
                               <input
                                 type="text"
                                 value={getRowValue(card, "billNo")}
                                 onChange={(e) => handleRowFieldChange(card.id, "billNo", e.target.value)}
-                                className="text-[11px] font-mono font-bold text-slate-800 bg-transparent border-0 p-0 focus:ring-0 focus:outline-none w-full"
+                                className="text-[10px] font-mono font-bold text-slate-800 bg-transparent border-0 p-0 focus:ring-0 focus:outline-none w-full"
                               />
                             </div>
 
                             {/* Reasons for Analysis / Problem Remarks */}
-                            <div className="flex items-center gap-1 bg-white p-1 rounded border border-purple-100 shadow-2xs">
-                              <span className="text-[9px] font-extrabold text-purple-900 w-16 shrink-0">{isTe ? "రిమార్క్స్:" : "Remarks:"}</span>
+                            <div className="flex items-center gap-1 bg-white p-0.5 rounded border border-purple-100 shadow-3xs">
+                              <span className="text-[8px] font-extrabold text-purple-900 w-12 shrink-0 uppercase">{isTe ? "రిమార్క్స్:" : "Rem:"}</span>
                               <input
                                 type="text"
                                 value={getRowValue(card, "reasonsForAnalysis") !== undefined ? getRowValue(card, "reasonsForAnalysis") : (card.reasonsForAnalysis || card.problemDescription || "")}
                                 onChange={(e) => handleRowFieldChange(card.id, "reasonsForAnalysis", e.target.value)}
-                                className="text-[11px] font-bold text-slate-800 bg-transparent border-0 p-0 focus:ring-0 focus:outline-none w-full"
-                              />
-                            </div>
-
-                            {/* Telecalling */}
-                            <div className="flex items-center gap-1 bg-white p-1 rounded border border-purple-100 shadow-2xs">
-                              <span className="text-[9px] font-extrabold text-purple-900 w-16 shrink-0">{isTe ? "టెలికాల్:" : "Telecall:"}</span>
-                              <input
-                                type="text"
-                                value={getRowValue(card, "telecalling")}
-                                onChange={(e) => handleRowFieldChange(card.id, "telecalling", e.target.value)}
-                                className="text-[11px] font-bold text-slate-800 bg-transparent border-0 p-0 focus:ring-0 focus:outline-none w-full"
+                                className="text-[10px] font-bold text-slate-800 bg-transparent border-0 p-0 focus:ring-0 focus:outline-none w-full"
                               />
                             </div>
                           </div>

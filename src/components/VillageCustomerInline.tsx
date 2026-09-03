@@ -159,9 +159,9 @@ Please bring your {TractorModel} tractor.`
 
   // Helper to format personalized message for a customer
   const getPersonalizedMessage = (cust: any) => {
-    const name = cust.custName || cust.cust_name || (isTe ? 'రైతు సోదరులారా' : 'Farmer');
-    const model = cust.tractorModel || cust.tractor_model || cust.model || (isTe ? 'ఈచర్ ట్రాక్టర్' : 'Eicher Tractor');
-    const chassis = cust.chassisNo || cust.chassis_no || '';
+    const name = cust.custName || cust.customerName || cust.cust_name || cust.customer_name || cust.Name || cust.name || cust.__custNameDisplay || (isTe ? 'రైతు సోదరులారా' : 'Farmer');
+    const model = cust.tractorModel || cust.tractor_model || cust.model || cust.Tractor || (isTe ? 'ఈచర్ ట్రాక్టర్' : 'Eicher Tractor');
+    const chassis = cust.chassisNo || cust.chassis_no || cust.Chassis || cust.chassis || '';
     return customMessage
       .replace(/\{CustomerName\}|\{పేరు\}/g, name)
       .replace(/\{Village\}|\{గ్రామం\}/g, villageName)
@@ -196,11 +196,11 @@ Please bring your {TractorModel} tractor.`
     const q = localSearch.trim().toLowerCase();
     if (!q) return customers;
     return customers.filter(c => {
-      const name = (c.custName || c.cust_name || '').toLowerCase();
-      const father = (c.fatherName || c.father_name || '').toLowerCase();
-      const mob = (c.ownerMob || c.owner_mob || c.mobileNumber || '').toLowerCase();
-      const model = (c.tractorModel || c.tractor_model || '').toLowerCase();
-      const chassis = (c.chassisNo || c.chassis_no || '').toLowerCase();
+      const name = (c.custName || c.cust_name || c.customerName || c.customer_name || c.Name || '').toLowerCase();
+      const father = (c.fatherName || c.father_name || c.FatherName || '').toLowerCase();
+      const mob = (c.ownerMob || c.owner_mob || c.mobileNumber || c.mobile_number || c.Phone || c.phNo || '').toLowerCase();
+      const model = (c.tractorModel || c.tractor_model || c.model || c.Tractor || '').toLowerCase();
+      const chassis = (c.chassisNo || c.chassis_no || c.Chassis || '').toLowerCase();
       return (
         name.includes(q) ||
         father.includes(q) ||
@@ -219,7 +219,7 @@ Please bring your {TractorModel} tractor.`
     });
 
     const mobiles = selectedCusts
-      .map(c => c.ownerMob || c.owner_mob || c.mobileNumber || c.phone || '')
+      .map(c => c.ownerMob || c.owner_mob || c.mobileNumber || c.mobile_number || c.phone || c.phNo || c.Phone || '')
       .map(m => String(m).replace(/[^0-9]/g, ''))
       .filter(m => m.length >= 10);
 
@@ -534,14 +534,9 @@ Please bring your {TractorModel} tractor.`
               </thead>
               <tbody className="divide-y divide-slate-200 bg-white">
                 {filteredCustomers.map((cust, idx) => {
-                  const custKey =
-                    cust.chassisKey ||
-                    cust.chassisNo ||
-                    cust.ownerMob ||
-                    cust.id ||
-                    `cust_${idx}`;
+                  const custKey = `${cust.chassisKey || ''}_${cust.chassisNo || ''}_${cust.ownerMob || cust.mobileNumber || ''}_${cust.id || ''}_${idx}`;
 
-                  const rawMob = cust.ownerMob || cust.owner_mob || cust.mobileNumber || cust.phone || '';
+                  const rawMob = cust.ownerMob || cust.owner_mob || cust.mobileNumber || cust.mobile_number || cust.phone || cust.phNo || cust.Phone || cust.custPhone || cust.__custPhoneDisplay || '';
                   const cleanMob = String(rawMob).replace(/[^0-9]/g, '');
                   const formattedMob = cleanMob.length === 10 ? cleanMob : rawMob;
                   const isSelected = selectedCustomerKeys.includes(custKey);
@@ -576,11 +571,11 @@ Please bring your {TractorModel} tractor.`
                       {/* Customer Name & S/o */}
                       <td className="p-2.5">
                         <div className="font-bold text-slate-900">
-                          {cust.custName || cust.cust_name || 'N/A'}
+                          {cust.custName || cust.customerName || cust.cust_name || cust.customer_name || cust.Name || cust.name || cust.__custNameDisplay || 'N/A'}
                         </div>
-                        {(cust.fatherName || cust.father_name) && (
+                        {(cust.fatherName || cust.father_name || cust.FatherName) && (
                           <div className="text-[11px] text-slate-500 font-medium">
-                            S/o {cust.fatherName || cust.father_name}
+                            S/o {cust.fatherName || cust.father_name || cust.FatherName}
                           </div>
                         )}
                         {(cust._isAiMatched || (cust.village && cust.village.trim().toLowerCase() !== villageName.trim().toLowerCase())) && (
@@ -634,10 +629,10 @@ Please bring your {TractorModel} tractor.`
                       {/* Model & Chassis */}
                       <td className="p-2.5">
                         <div className="font-bold text-blue-900">
-                          {cust.tractorModel || cust.tractor_model || cust.model || 'Eicher Tractor'}
+                          {cust.tractorModel || cust.tractor_model || cust.model || cust.Tractor || 'Eicher Tractor'}
                         </div>
                         <div className="font-mono text-[11px] text-slate-600 font-semibold">
-                          {cust.chassisNo || cust.chassis_no || ''}
+                          {cust.chassisNo || cust.chassis_no || cust.Chassis || ''}
                         </div>
                       </td>
 

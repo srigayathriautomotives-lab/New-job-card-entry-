@@ -98,34 +98,28 @@ async function ensureDbTables() {
     `);
 
     // Ensure staff table and columns exist
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS staff (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        role TEXT NOT NULL,
-        phone TEXT,
-        father_name TEXT,
-        village TEXT,
-        mandal TEXT,
-        mobile_number TEXT,
-        date_of_joining TEXT,
-        supervisor TEXT,
-        active TEXT DEFAULT 'true',
-        assigned_supervisor TEXT,
-        created_at TEXT,
-        updated_at TIMESTAMP DEFAULT NOW()
-      );
-      ALTER TABLE staff ADD COLUMN IF NOT EXISTS father_name TEXT;
-      ALTER TABLE staff ADD COLUMN IF NOT EXISTS village TEXT;
-      ALTER TABLE staff ADD COLUMN IF NOT EXISTS mandal TEXT;
-      ALTER TABLE staff ADD COLUMN IF NOT EXISTS mobile_number TEXT;
-      ALTER TABLE staff ADD COLUMN IF NOT EXISTS date_of_joining TEXT;
-      ALTER TABLE staff ADD COLUMN IF NOT EXISTS supervisor TEXT;
-      ALTER TABLE staff ADD COLUMN IF NOT EXISTS assigned_supervisor TEXT;
-      ALTER TABLE staff ADD COLUMN IF NOT EXISTS active TEXT DEFAULT 'true';
-      ALTER TABLE staff ADD COLUMN IF NOT EXISTS created_at TEXT;
-      ALTER TABLE staff ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW();
-    `);
+    try {
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS staff (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          role TEXT NOT NULL,
+          phone TEXT,
+          father_name TEXT,
+          village TEXT,
+          mandal TEXT,
+          mobile_number TEXT,
+          date_of_joining TEXT,
+          supervisor TEXT,
+          active TEXT DEFAULT 'true',
+          assigned_supervisor TEXT,
+          created_at TEXT,
+          updated_at TIMESTAMP DEFAULT NOW()
+        );
+      `);
+    } catch (e) {
+      console.warn('Notice ensuring staff table:', e);
+    }
 
     // Ensure customers table
     await client.query(`
@@ -220,8 +214,12 @@ async function ensureDbTables() {
     `);
 
     console.log('Database tables verified/created successfully.');
-  } catch (err) {
-    console.warn('DB initialization check:', err);
+  } catch (err: any) {
+    if (err && err.message && err.message.includes('permission denied for schema public')) {
+      console.log('Notice: Database user does not have DDL permission on schema public; assuming tables are pre-configured.');
+    } else {
+      console.warn('DB initialization check:', err);
+    }
   }
 }
 ensureDbTables();
@@ -697,7 +695,7 @@ app.post('/api/spares/bulk', async (req, res) => {
     return res.status(400).json({ success: false, error: 'Rows array required' });
   }
 
-  if (rows.length === 0) {
+  if (rows.length === 0 && !replaceAll) {
     return res.json({ success: true, count: 0 });
   }
 
@@ -710,7 +708,20 @@ app.post('/api/spares/bulk', async (req, res) => {
     }
 
     const seenKeys = new Set<string>();
-    const normalizedRows = rows.map((r, i) => normalizeSpareRow(r, i, seenKeys));
+    let normalizedRows = rows.map((r, i) => normalizeSpareRow(r, i, seenKeys));
+
+    // If merging (not replacing), we should deduplicate by part_no if possible
+    if (!replaceAll) {
+      const existing = await client.query('SELECT part_no, part_key FROM spares');
+      const existingPartNos = new Map(existing.rows.map(r => [r.part_no, r.part_key]));
+      
+      normalizedRows = normalizedRows.map(row => {
+        if (existingPartNos.has(row.partNo)) {
+          return { ...row, partKey: existingPartNos.get(row.partNo) };
+        }
+        return row;
+      });
+    }
 
     const insertQuery = `
       INSERT INTO spares (
