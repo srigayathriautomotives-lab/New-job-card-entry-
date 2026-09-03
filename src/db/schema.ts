@@ -81,6 +81,13 @@ export const jobcards = pgTable('jobcards', {
   nonWarrantyMaterial: text('non_warranty_material'),
   gTotal: text('g_total'),
   actualClosedDate: text('actual_closed_date'),
+  branch: text('branch'),
+  historyFileNo: text('history_file_no'),
+  complaintDate: text('complaint_date'),
+  installDate: text('install_date'),
+  dateOfDelivery: text('date_of_delivery'),
+  distDealership: text('dist_dealership'),
+  fullData: text('full_data'),
   checkpoints: text('checkpoints'),
   repairRows: text('repair_rows'),
   partRows: text('part_rows'),
@@ -139,3 +146,26 @@ export const appSettings = pgTable('app_settings', {
   value: text('value').notNull(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });
+
+// Service Camp Planning Table
+export const serviceCamps = pgTable('service_camps', {
+  id: text('id').primaryKey(),
+  dealershipCode: text('dealership_code'),
+  branch: text('branch'),
+  mandal: text('mandal'),
+  village: text('village'),
+  campDate: text('camp_date'),
+  targetTractors: text('target_tractors'),
+  supervisor: text('supervisor'),
+  mechanic: text('mechanic'),
+  status: text('status'),
+  serviceTypeExpected: text('service_type_expected'),
+  offers: text('offers'),
+  contactPerson: text('contact_person'),
+  contactPhone: text('contact_phone'),
+  notes: text('notes'),
+  attendedCount: text('attended_count'),
+  createdAt: text('created_at'),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+

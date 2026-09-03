@@ -182,11 +182,18 @@ export async function apiFetchStaff(): Promise<any[]> {
       return json.data.map((row: any) => ({
         id: row.id,
         name: row.name,
-        role: row.role,
-        phone: row.phone,
-        active: String(row.active) === 'true',
-        assignedSupervisor: row.assigned_supervisor,
-        createdAt: row.created_at
+        role: row.role || 'mechanic',
+        phone: row.phone || row.mobile_number || row.mobileNumber || '',
+        mobileNumber: row.mobileNumber || row.mobile_number || row.phone || '',
+        fatherName: row.fatherName || row.father_name || '',
+        village: row.village || '',
+        mandal: row.mandal || '',
+        dateOfJoining: row.dateOfJoining || row.date_of_joining || '',
+        supervisor: row.supervisor || row.assignedSupervisor || row.assigned_supervisor || '',
+        assignedSupervisor: row.assignedSupervisor || row.assigned_supervisor || row.supervisor || '',
+        active: String(row.active) === 'true' || row.active === true || row.active === undefined || row.active === '1',
+        createdAt: row.createdAt || row.created_at || '',
+        updatedAt: row.updatedAt || row.updated_at || ''
       }));
     }
   } catch (err) {
@@ -324,3 +331,79 @@ export async function apiSaveSparesBulk(rows: any[], replaceAll = false): Promis
     return false;
   }
 }
+
+// Service Camps API
+export async function apiFetchServiceCamps(): Promise<any[]> {
+  try {
+    const res = await fetch('/api/service-camps');
+    const json = await res.json();
+    if (json.success && Array.isArray(json.data)) {
+      return json.data.map((row: any) => ({
+        id: row.id,
+        dealershipCode: row.dealership_code || row.dealershipCode || '',
+        branch: row.branch || '',
+        mandal: row.mandal || '',
+        village: row.village || '',
+        campDate: row.camp_date || row.campDate || '',
+        targetTractors: row.target_tractors || row.targetTractors || '',
+        supervisor: row.supervisor || '',
+        mechanic: row.mechanic || '',
+        status: row.status || 'Upcoming',
+        serviceTypeExpected: row.service_type_expected || row.serviceTypeExpected || '',
+        offers: row.offers || '',
+        contactPerson: row.contact_person || row.contactPerson || '',
+        contactPhone: row.contact_phone || row.contactPhone || '',
+        notes: row.notes || '',
+        attendedCount: row.attended_count || row.attendedCount || '',
+        createdAt: row.created_at || row.createdAt || ''
+      }));
+    }
+  } catch (err) {
+    console.warn('API fetch service camps notice:', err);
+  }
+  return [];
+}
+
+export async function apiSaveServiceCamp(camp: any): Promise<boolean> {
+  try {
+    const res = await fetch('/api/service-camps', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(camp),
+    });
+    const json = await res.json();
+    return !!json.success;
+  } catch (err) {
+    console.warn('API save service camp error:', err);
+    return false;
+  }
+}
+
+export async function apiDeleteServiceCamp(id: string): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/service-camps/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    });
+    const json = await res.json();
+    return !!json.success;
+  } catch (err) {
+    console.warn('API delete service camp error:', err);
+    return false;
+  }
+}
+
+export async function apiSaveServiceCampsBulk(camps: any[], replaceAll = false): Promise<boolean> {
+  try {
+    const res = await fetch('/api/service-camps/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ camps, replaceAll }),
+    });
+    const json = await res.json();
+    return !!json.success;
+  } catch (err) {
+    console.warn('API bulk save service camps error:', err);
+    return false;
+  }
+}
+

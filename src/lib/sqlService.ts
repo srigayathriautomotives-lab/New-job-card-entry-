@@ -1,12 +1,46 @@
 // Real PostgreSQL REST API client for Sri Balaji Eicher Tractors
 
+async function safeRequestJson<T = any>(
+  url: string,
+  options?: RequestInit,
+  retries = 2
+): Promise<T | null> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(url, options);
+      if (!res.ok) {
+        if (attempt < retries && (res.status === 502 || res.status === 503 || res.status === 504 || res.status === 404)) {
+          await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
+          continue;
+        }
+        return null;
+      }
+      const contentType = res.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        if (attempt < retries) {
+          await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
+          continue;
+        }
+        return null;
+      }
+      return (await res.json()) as T;
+    } catch (err) {
+      if (attempt < retries) {
+        await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
+        continue;
+      }
+      return null;
+    }
+  }
+  return null;
+}
+
 export const sqlApi = {
   // Customers
   fetchCustomers: async () => {
     try {
-      const res = await fetch('/api/customers');
-      const data = await res.json();
-      if (data.success && Array.isArray(data.data)) {
+      const data = await safeRequestJson<{ success: boolean; data: any[] }>('/api/customers');
+      if (data && data.success && Array.isArray(data.data)) {
         return data.data.map((r: any) => {
           let fullData = {};
           let followupHistory = [];
@@ -33,8 +67,7 @@ export const sqlApi = {
         });
       }
       return [];
-    } catch (e) {
-      console.error('Error fetching customers from PostgreSQL:', e);
+    } catch {
       return [];
     }
   },
@@ -42,28 +75,26 @@ export const sqlApi = {
 
   saveCustomer: async (customer: any) => {
     try {
-      const res = await fetch('/api/customers', {
+      const res = await safeRequestJson('/api/customers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(customer)
       });
-      return await res.json();
+      return res || { success: false, error: 'Request failed' };
     } catch (e) {
-      console.error('Error saving customer to PostgreSQL:', e);
       return { success: false, error: String(e) };
     }
   },
 
   bulkUpsertCustomers: async (rows: any[], replaceAll = false) => {
     try {
-      const res = await fetch('/api/customers/bulk', {
+      const res = await safeRequestJson('/api/customers/bulk', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ rows, replaceAll })
       });
-      return await res.json();
+      return res || { success: false, error: 'Request failed' };
     } catch (e) {
-      console.error('Error bulk saving customers to PostgreSQL:', e);
       return { success: false, error: String(e) };
     }
   },
@@ -71,12 +102,11 @@ export const sqlApi = {
 
   deleteAllCustomers: async () => {
     try {
-      const res = await fetch('/api/database/delete-all-customers', {
+      const res = await safeRequestJson('/api/database/delete-all-customers', {
         method: 'POST',
       });
-      return await res.json();
+      return res || { success: false, error: 'Request failed' };
     } catch (e) {
-      console.error('Error deleting all customers from PostgreSQL:', e);
       return { success: false, error: String(e) };
     }
   },
@@ -84,9 +114,8 @@ export const sqlApi = {
   // Spares
   fetchSpares: async () => {
     try {
-      const res = await fetch('/api/spares');
-      const data = await res.json();
-      if (data.success && Array.isArray(data.data)) {
+      const data = await safeRequestJson<{ success: boolean; data: any[] }>('/api/spares');
+      if (data && data.success && Array.isArray(data.data)) {
         return data.data.map((r: any) => {
           let fullData = {};
           try { fullData = typeof r.full_data === 'string' ? JSON.parse(r.full_data) : (r.full_data || {}); } catch {}
@@ -102,8 +131,7 @@ export const sqlApi = {
         });
       }
       return [];
-    } catch (e) {
-      console.error('Error fetching spares from PostgreSQL:', e);
+    } catch {
       return [];
     }
   },
@@ -111,28 +139,26 @@ export const sqlApi = {
 
   saveSpare: async (spare: any) => {
     try {
-      const res = await fetch('/api/spares/bulk', {
+      const res = await safeRequestJson('/api/spares/bulk', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ rows: [spare], replaceAll: false })
       });
-      return await res.json();
+      return res || { success: false, error: 'Request failed' };
     } catch (e) {
-      console.error('Error saving spare to PostgreSQL:', e);
       return { success: false, error: String(e) };
     }
   },
 
   bulkUpsertSpares: async (rows: any[], replaceAll = false) => {
     try {
-      const res = await fetch('/api/spares/bulk', {
+      const res = await safeRequestJson('/api/spares/bulk', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ rows, replaceAll })
       });
-      return await res.json();
+      return res || { success: false, error: 'Request failed' };
     } catch (e) {
-      console.error('Error bulk saving spares to PostgreSQL:', e);
       return { success: false, error: String(e) };
     }
   },
@@ -141,18 +167,20 @@ export const sqlApi = {
   // Jobcards
   fetchJobcards: async () => {
     try {
-      const res = await fetch('/api/jobcards');
-      const data = await res.json();
-      if (data.success && Array.isArray(data.data)) {
+      const data = await safeRequestJson<{ success: boolean; data: any[] }>('/api/jobcards');
+      if (data && data.success && Array.isArray(data.data)) {
         return data.data.map((r: any) => {
           let checkpoints = [];
           let repairRows = [];
           let partRows = [];
+          let fullData: any = {};
           try { checkpoints = typeof r.checkpoints === 'string' ? JSON.parse(r.checkpoints) : (r.checkpoints || []); } catch {}
           try { repairRows = typeof r.repair_rows === 'string' ? JSON.parse(r.repair_rows) : (r.repair_rows || []); } catch {}
           try { partRows = typeof r.part_rows === 'string' ? JSON.parse(r.part_rows) : (r.part_rows || []); } catch {}
+          try { fullData = typeof r.full_data === 'string' ? JSON.parse(r.full_data) : (r.full_data || {}); } catch {}
 
           return {
+            ...fullData,
             id: r.id,
             jobNo: r.job_no,
             onlineJobCardNo: r.online_job_card_no,
@@ -180,6 +208,7 @@ export const sqlApi = {
             extraRepairs: r.extra_repairs,
             mechanic: r.mechanic,
             mechanicName: r.mechanic,
+            technicianName: r.mechanic,
             wsIncharge: r.ws_incharge,
             supervisor: r.ws_incharge,
             serviceLocation: r.service_location,
@@ -192,6 +221,12 @@ export const sqlApi = {
             nonWarrantyMaterial: r.non_warranty_material,
             gTotal: r.g_total,
             actualClosedDate: r.actual_closed_date,
+            branch: r.branch || fullData.branch || '',
+            historyFileNo: r.history_file_no || fullData.historyFileNo || '',
+            complaintDate: r.complaint_date || fullData.complaintDate || '',
+            installDate: r.install_date || r.date_of_delivery || fullData.installDate || '',
+            dateOfDelivery: r.date_of_delivery || r.install_date || fullData.dateOfDelivery || '',
+            distDealership: r.dist_dealership || fullData.distDealership || '',
             checkpoints,
             repairRows,
             partRows,
@@ -202,8 +237,7 @@ export const sqlApi = {
         });
       }
       return [];
-    } catch (e) {
-      console.error('Error fetching jobcards from PostgreSQL:', e);
+    } catch {
       return [];
     }
   },
@@ -211,14 +245,13 @@ export const sqlApi = {
 
   saveJobcard: async (card: any) => {
     try {
-      const res = await fetch('/api/jobcards', {
+      const res = await safeRequestJson('/api/jobcards', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(card)
       });
-      return await res.json();
+      return res || { success: false, error: 'Request failed' };
     } catch (e) {
-      console.error('Error saving jobcard to PostgreSQL:', e);
       return { success: false, error: String(e) };
     }
   },
@@ -226,12 +259,11 @@ export const sqlApi = {
 
   deleteJobcard: async (id: string) => {
     try {
-      const res = await fetch(`/api/jobcards/${encodeURIComponent(id)}`, {
+      const res = await safeRequestJson(`/api/jobcards/${encodeURIComponent(id)}`, {
         method: 'DELETE'
       });
-      return await res.json();
+      return res || { success: false, error: 'Request failed' };
     } catch (e) {
-      console.error('Error deleting jobcard from PostgreSQL:', e);
       return { success: false, error: String(e) };
     }
   },
@@ -239,14 +271,13 @@ export const sqlApi = {
 
   bulkUpsertJobcards: async (cards: any[], replaceAll = false) => {
     try {
-      const res = await fetch('/api/jobcards/bulk', {
+      const res = await safeRequestJson('/api/jobcards/bulk', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cards, replaceAll })
       });
-      return await res.json();
+      return res || { success: false, error: 'Request failed' };
     } catch (e) {
-      console.error('Error bulk saving jobcards to PostgreSQL:', e);
       return { success: false, error: String(e) };
     }
   },
@@ -254,14 +285,13 @@ export const sqlApi = {
 
   bulkDeleteJobcards: async (ids: string[]) => {
     try {
-      const res = await fetch('/api/database/delete-jobcards', {
+      const res = await safeRequestJson('/api/database/delete-jobcards', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids })
       });
-      return await res.json();
+      return res || { success: false, error: 'Request failed' };
     } catch (e) {
-      console.error('Error bulk deleting jobcards from PostgreSQL:', e);
       return { success: false, error: String(e) };
     }
   },
@@ -269,9 +299,8 @@ export const sqlApi = {
   // Complaints
   fetchComplaints: async () => {
     try {
-      const res = await fetch('/api/complaints');
-      const data = await res.json();
-      if (data.success && Array.isArray(data.data)) {
+      const data = await safeRequestJson<{ success: boolean; data: any[] }>('/api/complaints');
+      if (data && data.success && Array.isArray(data.data)) {
         return data.data.map((r: any) => ({
           id: r.id,
           complaintNo: r.complaint_no,
@@ -293,8 +322,7 @@ export const sqlApi = {
         }));
       }
       return [];
-    } catch (e) {
-      console.error('Error fetching complaints from PostgreSQL:', e);
+    } catch {
       return [];
     }
   },
@@ -302,40 +330,37 @@ export const sqlApi = {
 
   saveComplaint: async (complaint: any) => {
     try {
-      const res = await fetch('/api/complaints', {
+      const res = await safeRequestJson('/api/complaints', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(complaint)
       });
-      return await res.json();
+      return res || { success: false, error: 'Request failed' };
     } catch (e) {
-      console.error('Error saving complaint to PostgreSQL:', e);
       return { success: false, error: String(e) };
     }
   },
 
   deleteComplaint: async (id: string) => {
     try {
-      const res = await fetch(`/api/complaints/${encodeURIComponent(id)}`, {
+      const res = await safeRequestJson(`/api/complaints/${encodeURIComponent(id)}`, {
         method: 'DELETE'
       });
-      return await res.json();
+      return res || { success: false, error: 'Request failed' };
     } catch (e) {
-      console.error('Error deleting complaint from PostgreSQL:', e);
       return { success: false, error: String(e) };
     }
   },
 
   bulkUpsertComplaints: async (complaints: any[], replaceAll = false) => {
     try {
-      const res = await fetch('/api/complaints/bulk', {
+      const res = await safeRequestJson('/api/complaints/bulk', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ complaints, replaceAll })
       });
-      return await res.json();
+      return res || { success: false, error: 'Request failed' };
     } catch (e) {
-      console.error('Error bulk saving complaints to PostgreSQL:', e);
       return { success: false, error: String(e) };
     }
   },
@@ -344,22 +369,27 @@ export const sqlApi = {
   // Staff
   fetchStaff: async () => {
     try {
-      const res = await fetch('/api/staff');
-      const data = await res.json();
-      if (data.success && Array.isArray(data.data)) {
+      const data = await safeRequestJson<{ success: boolean; data: any[] }>('/api/staff');
+      if (data && data.success && Array.isArray(data.data)) {
         return data.data.map((r: any) => ({
           id: r.id,
           name: r.name,
-          role: r.role,
-          phone: r.phone,
+          role: r.role || 'mechanic',
+          phone: r.phone || r.mobile_number || '',
+          mobileNumber: r.mobile_number || r.phone || '',
+          fatherName: r.father_name || r.fatherName || '',
+          village: r.village || '',
+          mandal: r.mandal || '',
+          dateOfJoining: r.date_of_joining || r.dateOfJoining || '',
+          supervisor: r.supervisor || r.assigned_supervisor || '',
+          assignedSupervisor: r.assigned_supervisor || r.supervisor || '',
           active: r.active === 'true' || r.active === true,
-          assignedSupervisor: r.assigned_supervisor,
-          createdAt: r.created_at
+          createdAt: r.created_at,
+          updatedAt: r.updated_at
         }));
       }
       return [];
-    } catch (e) {
-      console.error('Error fetching staff from PostgreSQL:', e);
+    } catch {
       return [];
     }
   },
@@ -367,40 +397,37 @@ export const sqlApi = {
 
   saveStaff: async (staff: any) => {
     try {
-      const res = await fetch('/api/staff', {
+      const res = await safeRequestJson('/api/staff', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(staff)
       });
-      return await res.json();
+      return res || { success: false, error: 'Request failed' };
     } catch (e) {
-      console.error('Error saving staff to PostgreSQL:', e);
       return { success: false, error: String(e) };
     }
   },
 
   deleteStaff: async (id: string) => {
     try {
-      const res = await fetch(`/api/staff/${encodeURIComponent(id)}`, {
+      const res = await safeRequestJson(`/api/staff/${encodeURIComponent(id)}`, {
         method: 'DELETE'
       });
-      return await res.json();
+      return res || { success: false, error: 'Request failed' };
     } catch (e) {
-      console.error('Error deleting staff from PostgreSQL:', e);
       return { success: false, error: String(e) };
     }
   },
 
   bulkUpsertStaff: async (staff: any[], replaceAll = false) => {
     try {
-      const res = await fetch('/api/staff/bulk', {
+      const res = await safeRequestJson('/api/staff/bulk', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ staff, replaceAll })
       });
-      return await res.json();
+      return res || { success: false, error: 'Request failed' };
     } catch (e) {
-      console.error('Error bulk saving staff to PostgreSQL:', e);
       return { success: false, error: String(e) };
     }
   },
@@ -409,14 +436,12 @@ export const sqlApi = {
   // Attendance
   fetchAttendance: async () => {
     try {
-      const res = await fetch('/api/attendance');
-      const data = await res.json();
-      if (data.success && data.data) {
+      const data = await safeRequestJson<{ success: boolean; data: any }>('/api/attendance');
+      if (data && data.success && data.data) {
         return data.data;
       }
       return {};
-    } catch (e) {
-      console.error('Error fetching attendance from PostgreSQL:', e);
+    } catch {
       return {};
     }
   },
@@ -424,14 +449,13 @@ export const sqlApi = {
 
   saveAttendance: async (date: string, records: any) => {
     try {
-      const res = await fetch('/api/attendance', {
+      const res = await safeRequestJson('/api/attendance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ date, records })
       });
-      return await res.json();
+      return res || { success: false, error: 'Request failed' };
     } catch (e) {
-      console.error('Error saving attendance to PostgreSQL:', e);
       return { success: false, error: String(e) };
     }
   },
@@ -439,14 +463,12 @@ export const sqlApi = {
   // App Settings
   fetchSettings: async () => {
     try {
-      const res = await fetch('/api/settings');
-      const data = await res.json();
-      if (data.success && data.data) {
+      const data = await safeRequestJson<{ success: boolean; data: Record<string, string> }>('/api/settings');
+      if (data && data.success && data.data) {
         return data.data;
       }
       return {};
-    } catch (e) {
-      console.error('Error fetching settings from PostgreSQL:', e);
+    } catch {
       return {};
     }
   },
@@ -454,14 +476,13 @@ export const sqlApi = {
 
   saveSettings: async (key: string, value: string) => {
     try {
-      const res = await fetch('/api/settings', {
+      const res = await safeRequestJson('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key, value })
       });
-      return await res.json();
+      return res || { success: false, error: 'Request failed' };
     } catch (e) {
-      console.error('Error saving setting to PostgreSQL:', e);
       return { success: false, error: String(e) };
     }
   },
@@ -469,10 +490,78 @@ export const sqlApi = {
   // Master Backup
   fetchMasterBackup: async () => {
     try {
-      const res = await fetch('/api/master-backup');
-      return await res.json();
+      const res = await safeRequestJson('/api/master-backup');
+      return res || { success: false, error: 'Request failed' };
     } catch (e) {
-      console.error('Error fetching master backup from PostgreSQL:', e);
+      return { success: false, error: String(e) };
+    }
+  },
+
+  // Service Camps
+  fetchServiceCamps: async () => {
+    try {
+      const data = await safeRequestJson<{ success: boolean; data: any[] }>('/api/service-camps');
+      if (data && data.success && Array.isArray(data.data)) {
+        return data.data.map((r: any) => ({
+          id: r.id,
+          dealershipCode: r.dealership_code || r.dealershipCode || '4731',
+          branch: r.branch || '',
+          mandal: r.mandal || '',
+          village: r.village || '',
+          campDate: r.camp_date || r.campDate || '',
+          targetTractors: r.target_tractors || r.targetTractors || '',
+          supervisor: r.supervisor || '',
+          mechanic: r.mechanic || '',
+          status: r.status || 'Upcoming',
+          serviceTypeExpected: r.service_type_expected || r.serviceTypeExpected || '',
+          offers: r.offers || '',
+          contactPerson: r.contact_person || r.contactPerson || '',
+          contactPhone: r.contact_phone || r.contactPhone || '',
+          notes: r.notes || '',
+          attendedCount: r.attended_count || r.attendedCount || '',
+          createdAt: r.created_at || r.createdAt || ''
+        }));
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  },
+  getServiceCamps: async () => sqlApi.fetchServiceCamps(),
+
+  saveServiceCamp: async (camp: any) => {
+    try {
+      const res = await safeRequestJson('/api/service-camps', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(camp)
+      });
+      return res || { success: false, error: 'Request failed' };
+    } catch (e) {
+      return { success: false, error: String(e) };
+    }
+  },
+
+  deleteServiceCamp: async (id: string) => {
+    try {
+      const res = await safeRequestJson(`/api/service-camps/${encodeURIComponent(id)}`, {
+        method: 'DELETE'
+      });
+      return res || { success: false, error: 'Request failed' };
+    } catch (e) {
+      return { success: false, error: String(e) };
+    }
+  },
+
+  bulkUpsertServiceCamps: async (camps: any[], replaceAll = false) => {
+    try {
+      const res = await safeRequestJson('/api/service-camps/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ camps, replaceAll })
+      });
+      return res || { success: false, error: 'Request failed' };
+    } catch (e) {
       return { success: false, error: String(e) };
     }
   }

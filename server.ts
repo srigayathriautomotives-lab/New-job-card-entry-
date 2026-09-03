@@ -15,19 +15,225 @@ function getPool() {
   return pool;
 }
 
+async function ensureDbTables() {
+  try {
+    const client = getPool();
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS jobcards (
+        id TEXT PRIMARY KEY,
+        job_no TEXT,
+        online_job_card_no TEXT,
+        job_date TEXT,
+        date_time_in TEXT,
+        date_time_out TEXT,
+        expected_repair_time TEXT,
+        status TEXT,
+        cust_name TEXT,
+        father_name TEXT,
+        cust_addr TEXT,
+        village TEXT,
+        mandal TEXT,
+        owner_mob TEXT,
+        driver_mob TEXT,
+        regd_no TEXT,
+        chassis_no TEXT,
+        engine_no TEXT,
+        model TEXT,
+        model_type TEXT,
+        serial_no TEXT,
+        hour_meter TEXT,
+        service_type TEXT,
+        free_service_list TEXT,
+        extra_repairs TEXT,
+        mechanic TEXT,
+        ws_incharge TEXT,
+        service_location TEXT,
+        bill_no TEXT,
+        reasons_for_analysis TEXT,
+        telecalling TEXT,
+        warranty_override TEXT,
+        total_labour TEXT,
+        warranty_material TEXT,
+        non_warranty_material TEXT,
+        g_total TEXT,
+        actual_closed_date TEXT,
+        branch TEXT,
+        history_file_no TEXT,
+        complaint_date TEXT,
+        install_date TEXT,
+        date_of_delivery TEXT,
+        dist_dealership TEXT,
+        full_data TEXT,
+        checkpoints TEXT,
+        repair_rows TEXT,
+        part_rows TEXT,
+        created_by TEXT,
+        created_by_email TEXT,
+        created_at TEXT,
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS service_camps (
+        id TEXT PRIMARY KEY,
+        dealership_code TEXT,
+        branch TEXT,
+        mandal TEXT,
+        village TEXT,
+        camp_date TEXT,
+        target_tractors TEXT,
+        supervisor TEXT,
+        mechanic TEXT,
+        status TEXT,
+        service_type_expected TEXT,
+        offers TEXT,
+        contact_person TEXT,
+        contact_phone TEXT,
+        notes TEXT,
+        attended_count TEXT,
+        created_at TEXT,
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+
+    // Ensure staff table and columns exist
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS staff (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        role TEXT NOT NULL,
+        phone TEXT,
+        father_name TEXT,
+        village TEXT,
+        mandal TEXT,
+        mobile_number TEXT,
+        date_of_joining TEXT,
+        supervisor TEXT,
+        active TEXT DEFAULT 'true',
+        assigned_supervisor TEXT,
+        created_at TEXT,
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+      ALTER TABLE staff ADD COLUMN IF NOT EXISTS father_name TEXT;
+      ALTER TABLE staff ADD COLUMN IF NOT EXISTS village TEXT;
+      ALTER TABLE staff ADD COLUMN IF NOT EXISTS mandal TEXT;
+      ALTER TABLE staff ADD COLUMN IF NOT EXISTS mobile_number TEXT;
+      ALTER TABLE staff ADD COLUMN IF NOT EXISTS date_of_joining TEXT;
+      ALTER TABLE staff ADD COLUMN IF NOT EXISTS supervisor TEXT;
+      ALTER TABLE staff ADD COLUMN IF NOT EXISTS assigned_supervisor TEXT;
+      ALTER TABLE staff ADD COLUMN IF NOT EXISTS active TEXT DEFAULT 'true';
+      ALTER TABLE staff ADD COLUMN IF NOT EXISTS created_at TEXT;
+      ALTER TABLE staff ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW();
+    `);
+
+    // Ensure customers table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS customers (
+        id SERIAL PRIMARY KEY,
+        chassis_key TEXT NOT NULL UNIQUE,
+        chassis_no TEXT NOT NULL,
+        cust_name TEXT,
+        father_name TEXT,
+        cust_addr TEXT,
+        village TEXT,
+        mandal TEXT,
+        owner_mob TEXT,
+        driver_mob TEXT,
+        regd_no TEXT,
+        engine_no TEXT,
+        tractor_model TEXT,
+        date_of_delivery TEXT,
+        followup_history TEXT,
+        full_data TEXT,
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+
+    // Ensure spares table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS spares (
+        id SERIAL PRIMARY KEY,
+        part_key TEXT NOT NULL UNIQUE,
+        part_no TEXT NOT NULL,
+        part_desc TEXT,
+        mrp TEXT,
+        category TEXT,
+        full_data TEXT,
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+
+    // Ensure complaints table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS complaints (
+        id TEXT PRIMARY KEY,
+        complaint_no TEXT,
+        date TEXT,
+        customer_name TEXT,
+        phone TEXT,
+        village TEXT,
+        mandal TEXT,
+        tractor_model TEXT,
+        chassis_no TEXT,
+        hours TEXT,
+        complaint_details TEXT,
+        mechanic TEXT,
+        status TEXT,
+        job_card_no TEXT,
+        closure_date TEXT,
+        remarks TEXT,
+        created_at TEXT,
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+
+    // Ensure staff_attendance table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS staff_attendance (
+        id SERIAL PRIMARY KEY,
+        date TEXT NOT NULL UNIQUE,
+        records TEXT NOT NULL,
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+
+    // Ensure app_settings table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS app_settings (
+        id SERIAL PRIMARY KEY,
+        key TEXT NOT NULL UNIQUE,
+        value TEXT NOT NULL,
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+
+    // Ensure columns exist on jobcards table
+    await client.query(`
+      ALTER TABLE jobcards ADD COLUMN IF NOT EXISTS branch TEXT;
+      ALTER TABLE jobcards ADD COLUMN IF NOT EXISTS history_file_no TEXT;
+      ALTER TABLE jobcards ADD COLUMN IF NOT EXISTS complaint_date TEXT;
+      ALTER TABLE jobcards ADD COLUMN IF NOT EXISTS install_date TEXT;
+      ALTER TABLE jobcards ADD COLUMN IF NOT EXISTS date_of_delivery TEXT;
+      ALTER TABLE jobcards ADD COLUMN IF NOT EXISTS dist_dealership TEXT;
+      ALTER TABLE jobcards ADD COLUMN IF NOT EXISTS full_data TEXT;
+    `);
+
+    console.log('Database tables verified/created successfully.');
+  } catch (err) {
+    console.warn('DB initialization check:', err);
+  }
+}
+ensureDbTables();
+
 // Clear database API
 app.post('/api/database/clear', async (req, res) => {
-  const { password } = req.body;
-  if (password !== 'AdminClear123') { // Simple placeholder check
-    return res.status(401).json({ success: false, error: 'Unauthorized' });
-  }
-
   const client = await getPool().connect();
   console.log('Database clearing initiated on configured PostgreSQL database');
   try {
     await client.query('BEGIN');
     await client.query('SET session_replication_role = replica;');
-    await client.query('TRUNCATE TABLE customers, jobcards, complaints, spares, staff, staff_attendance, app_settings RESTART IDENTITY CASCADE');
+    await client.query('TRUNCATE TABLE customers, jobcards, complaints, spares, staff, staff_attendance, app_settings, service_camps RESTART IDENTITY CASCADE');
     await client.query('SET session_replication_role = origin;');
     await client.query('COMMIT');
     console.log('Database cleared successfully.');
@@ -174,12 +380,17 @@ function normalizeCustomerRow(r: any, index: number, seenKeys: Set<string>) {
   }
 
   let finalKey = baseKey;
-  let counter = 1;
-  while (seenKeys.has(finalKey)) {
-    counter++;
-    finalKey = `${baseKey}_dup${counter}`;
+  if (seenKeys) {
+    // Only append duplicate suffix if there is NO real chassis number provided
+    if (!normKey(chassisNo)) {
+      let counter = 1;
+      while (seenKeys.has(finalKey)) {
+        counter++;
+        finalKey = `${baseKey}_dup${counter}`;
+      }
+    }
+    seenKeys.add(finalKey);
   }
-  seenKeys.add(finalKey);
 
   let followupHistory = [];
   try {
@@ -316,7 +527,17 @@ app.post('/api/customers/bulk', async (req, res) => {
     }
 
     const seenKeys = new Set<string>();
-    const normalizedRows = rows.map((r, i) => normalizeCustomerRow(r, i, seenKeys));
+    const rowMap = new Map<string, any>();
+    rows.forEach((r, i) => {
+      const norm = normalizeCustomerRow(r, i, seenKeys);
+      if (rowMap.has(norm.chassisKey)) {
+        const existing = rowMap.get(norm.chassisKey);
+        rowMap.set(norm.chassisKey, { ...existing, ...norm });
+      } else {
+        rowMap.set(norm.chassisKey, norm);
+      }
+    });
+    const normalizedRows = Array.from(rowMap.values());
 
     const insertQuery = `
       INSERT INTO customers (
@@ -566,11 +787,13 @@ app.post('/api/jobcards', async (req, res) => {
         extra_repairs, mechanic, ws_incharge, service_location, bill_no,
         reasons_for_analysis, telecalling, warranty_override, total_labour,
         warranty_material, non_warranty_material, g_total, actual_closed_date,
+        branch, history_file_no, complaint_date, install_date, date_of_delivery, dist_dealership, full_data,
         checkpoints, repair_rows, part_rows, created_by, created_by_email, created_at, updated_at
       ) VALUES (
         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
         $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30,
-        $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, NOW()
+        $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44,
+        $45, $46, $47, $48, $49, $50, NOW()
       )
       ON CONFLICT (id) DO UPDATE SET
         job_no = EXCLUDED.job_no,
@@ -609,6 +832,13 @@ app.post('/api/jobcards', async (req, res) => {
         non_warranty_material = EXCLUDED.non_warranty_material,
         g_total = EXCLUDED.g_total,
         actual_closed_date = EXCLUDED.actual_closed_date,
+        branch = EXCLUDED.branch,
+        history_file_no = EXCLUDED.history_file_no,
+        complaint_date = EXCLUDED.complaint_date,
+        install_date = EXCLUDED.install_date,
+        date_of_delivery = EXCLUDED.date_of_delivery,
+        dist_dealership = EXCLUDED.dist_dealership,
+        full_data = EXCLUDED.full_data,
         checkpoints = EXCLUDED.checkpoints,
         repair_rows = EXCLUDED.repair_rows,
         part_rows = EXCLUDED.part_rows,
@@ -617,6 +847,8 @@ app.post('/api/jobcards', async (req, res) => {
         updated_at = NOW()
       RETURNING *;
     `;
+
+    const fullData = card.fullData || card.full_data || card;
 
     const result = await client.query(query, [
       card.id,
@@ -644,7 +876,7 @@ app.post('/api/jobcards', async (req, res) => {
       card.serviceType || card.service_type || '',
       card.freeServiceList || card.free_service_list || '',
       card.extraRepairs || card.extra_repairs || '',
-      card.mechanic || '',
+      card.mechanic || card.technicianName || '',
       card.wsIncharge || card.ws_incharge || '',
       card.serviceLocation || card.service_location || '',
       card.billNo || card.bill_no || '',
@@ -656,6 +888,13 @@ app.post('/api/jobcards', async (req, res) => {
       card.nonWarrantyMaterial || card.non_warranty_material || '',
       card.gTotal || card.g_total || '',
       card.actualClosedDate || card.actual_closed_date || '',
+      card.branch || '',
+      card.historyFileNo || card.history_file_no || '',
+      card.complaintDate || card.complaint_date || '',
+      card.installDate || card.install_date || card.dateOfDelivery || card.date_of_delivery || '',
+      card.dateOfDelivery || card.date_of_delivery || card.installDate || card.install_date || '',
+      card.distDealership || card.dist_dealership || '',
+      typeof fullData === 'object' ? JSON.stringify(fullData) : String(fullData || ''),
       JSON.stringify(card.checkpoints || []),
       JSON.stringify(card.repairRows || card.repair_rows || []),
       JSON.stringify(card.partRows || card.part_rows || []),
@@ -707,11 +946,13 @@ app.post('/api/jobcards/bulk', async (req, res) => {
         extra_repairs, mechanic, ws_incharge, service_location, bill_no,
         reasons_for_analysis, telecalling, warranty_override, total_labour,
         warranty_material, non_warranty_material, g_total, actual_closed_date,
+        branch, history_file_no, complaint_date, install_date, date_of_delivery, dist_dealership, full_data,
         checkpoints, repair_rows, part_rows, created_by, created_by_email, created_at, updated_at
       ) VALUES (
         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
         $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30,
-        $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, NOW()
+        $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44,
+        $45, $46, $47, $48, $49, $50, NOW()
       )
       ON CONFLICT (id) DO UPDATE SET
         job_no = EXCLUDED.job_no,
@@ -750,6 +991,13 @@ app.post('/api/jobcards/bulk', async (req, res) => {
         non_warranty_material = EXCLUDED.non_warranty_material,
         g_total = EXCLUDED.g_total,
         actual_closed_date = EXCLUDED.actual_closed_date,
+        branch = EXCLUDED.branch,
+        history_file_no = EXCLUDED.history_file_no,
+        complaint_date = EXCLUDED.complaint_date,
+        install_date = EXCLUDED.install_date,
+        date_of_delivery = EXCLUDED.date_of_delivery,
+        dist_dealership = EXCLUDED.dist_dealership,
+        full_data = EXCLUDED.full_data,
         checkpoints = EXCLUDED.checkpoints,
         repair_rows = EXCLUDED.repair_rows,
         part_rows = EXCLUDED.part_rows,
@@ -760,6 +1008,7 @@ app.post('/api/jobcards/bulk', async (req, res) => {
 
     for (const card of cards) {
       if (!card.id) continue;
+      const fullData = card.fullData || card.full_data || card;
       await client.query(query, [
         card.id,
         card.jobNo || card.job_no || '',
@@ -786,7 +1035,7 @@ app.post('/api/jobcards/bulk', async (req, res) => {
         card.serviceType || card.service_type || '',
         card.freeServiceList || card.free_service_list || '',
         card.extraRepairs || card.extra_repairs || '',
-        card.mechanic || '',
+        card.mechanic || card.technicianName || '',
         card.wsIncharge || card.ws_incharge || '',
         card.serviceLocation || card.service_location || '',
         card.billNo || card.bill_no || '',
@@ -798,6 +1047,13 @@ app.post('/api/jobcards/bulk', async (req, res) => {
         card.nonWarrantyMaterial || card.non_warranty_material || '',
         card.gTotal || card.g_total || '',
         card.actualClosedDate || card.actual_closed_date || '',
+        card.branch || '',
+        card.historyFileNo || card.history_file_no || '',
+        card.complaintDate || card.complaint_date || '',
+        card.installDate || card.install_date || card.dateOfDelivery || card.date_of_delivery || '',
+        card.dateOfDelivery || card.date_of_delivery || card.installDate || card.install_date || '',
+        card.distDealership || card.dist_dealership || '',
+        typeof fullData === 'object' ? JSON.stringify(fullData) : String(fullData || ''),
         JSON.stringify(card.checkpoints || []),
         JSON.stringify(card.repairRows || card.repair_rows || []),
         JSON.stringify(card.partRows || card.part_rows || []),
@@ -991,7 +1247,23 @@ app.get('/api/staff', async (req, res) => {
   try {
     const client = getPool();
     const result = await client.query('SELECT * FROM staff ORDER BY name ASC');
-    res.json({ success: true, data: result.rows });
+    const mapped = result.rows.map(r => ({
+      id: r.id,
+      name: r.name,
+      role: r.role,
+      phone: r.phone || r.mobile_number || '',
+      mobileNumber: r.mobile_number || r.phone || '',
+      fatherName: r.father_name || '',
+      village: r.village || '',
+      mandal: r.mandal || '',
+      dateOfJoining: r.date_of_joining || '',
+      supervisor: r.supervisor || r.assigned_supervisor || '',
+      assignedSupervisor: r.assigned_supervisor || r.supervisor || '',
+      active: r.active === 'true' || r.active === true || r.active === undefined || r.active === '1',
+      createdAt: r.created_at || '',
+      updatedAt: r.updated_at || ''
+    }));
+    res.json({ success: true, data: mapped });
   } catch (error: any) {
     console.error('Error fetching staff:', error);
     res.status(500).json({ success: false, error: error.message });
@@ -1001,20 +1273,26 @@ app.get('/api/staff', async (req, res) => {
 // Save/Update staff
 app.post('/api/staff', async (req, res) => {
   const st = req.body;
-  if (!st || !st.id || !st.name || !st.role) {
-    return res.status(400).json({ success: false, error: 'Staff ID, Name, and Role are required' });
+  if (!st || !st.id || !st.name) {
+    return res.status(400).json({ success: false, error: 'Staff ID and Name are required' });
   }
 
   try {
     const client = getPool();
     const query = `
       INSERT INTO staff (
-        id, name, role, phone, active, assigned_supervisor, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+        id, name, role, phone, father_name, village, mandal, mobile_number, date_of_joining, supervisor, active, assigned_supervisor, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW())
       ON CONFLICT (id) DO UPDATE SET
         name = EXCLUDED.name,
         role = EXCLUDED.role,
         phone = EXCLUDED.phone,
+        father_name = EXCLUDED.father_name,
+        village = EXCLUDED.village,
+        mandal = EXCLUDED.mandal,
+        mobile_number = EXCLUDED.mobile_number,
+        date_of_joining = EXCLUDED.date_of_joining,
+        supervisor = EXCLUDED.supervisor,
         active = EXCLUDED.active,
         assigned_supervisor = EXCLUDED.assigned_supervisor,
         updated_at = NOW()
@@ -1023,10 +1301,16 @@ app.post('/api/staff', async (req, res) => {
     const result = await client.query(query, [
       st.id,
       st.name,
-      st.role,
-      st.phone || '',
+      st.role || 'mechanic',
+      st.phone || st.mobileNumber || '',
+      st.fatherName || st.father_name || '',
+      st.village || '',
+      st.mandal || '',
+      st.mobileNumber || st.mobile_number || st.phone || '',
+      st.dateOfJoining || st.date_of_joining || '',
+      st.supervisor || st.assignedSupervisor || '',
       st.active !== undefined ? String(st.active) : 'true',
-      st.assignedSupervisor || st.assigned_supervisor || '',
+      st.assignedSupervisor || st.assigned_supervisor || st.supervisor || '',
       st.createdAt || st.created_at || new Date().toISOString()
     ]);
     res.json({ success: true, data: result.rows[0] });
@@ -1051,7 +1335,8 @@ app.delete('/api/staff/:id', async (req, res) => {
 
 // Bulk staff
 app.post('/api/staff/bulk', async (req, res) => {
-  const { staff: staffList, replaceAll } = req.body;
+  const staffList = Array.isArray(req.body.staffList) ? req.body.staffList : (Array.isArray(req.body.staff) ? req.body.staff : (Array.isArray(req.body) ? req.body : []));
+  const replaceAll = req.body.replaceAll;
   if (!Array.isArray(staffList)) {
     return res.status(400).json({ success: false, error: 'Staff array required' });
   }
@@ -1065,12 +1350,18 @@ app.post('/api/staff/bulk', async (req, res) => {
 
     const query = `
       INSERT INTO staff (
-        id, name, role, phone, active, assigned_supervisor, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+        id, name, role, phone, father_name, village, mandal, mobile_number, date_of_joining, supervisor, active, assigned_supervisor, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW())
       ON CONFLICT (id) DO UPDATE SET
         name = EXCLUDED.name,
         role = EXCLUDED.role,
         phone = EXCLUDED.phone,
+        father_name = EXCLUDED.father_name,
+        village = EXCLUDED.village,
+        mandal = EXCLUDED.mandal,
+        mobile_number = EXCLUDED.mobile_number,
+        date_of_joining = EXCLUDED.date_of_joining,
+        supervisor = EXCLUDED.supervisor,
         active = EXCLUDED.active,
         assigned_supervisor = EXCLUDED.assigned_supervisor,
         updated_at = NOW();
@@ -1081,10 +1372,16 @@ app.post('/api/staff/bulk', async (req, res) => {
       await client.query(query, [
         st.id,
         st.name,
-        st.role || 'Mechanic',
-        st.phone || '',
+        st.role || 'mechanic',
+        st.phone || st.mobileNumber || '',
+        st.fatherName || st.father_name || '',
+        st.village || '',
+        st.mandal || '',
+        st.mobileNumber || st.mobile_number || st.phone || '',
+        st.dateOfJoining || st.date_of_joining || '',
+        st.supervisor || st.assignedSupervisor || '',
         st.active !== undefined ? String(st.active) : 'true',
-        st.assignedSupervisor || st.assigned_supervisor || '',
+        st.assignedSupervisor || st.assigned_supervisor || st.supervisor || '',
         st.createdAt || st.created_at || new Date().toISOString()
       ]);
     }
@@ -1176,11 +1473,166 @@ app.post('/api/settings', async (req, res) => {
   }
 });
 
+// Service Camps API
+app.get('/api/service-camps', async (req, res) => {
+  try {
+    const client = getPool();
+    const result = await client.query('SELECT * FROM service_camps ORDER BY camp_date ASC, created_at DESC');
+    res.json({ success: true, data: result.rows });
+  } catch (error: any) {
+    console.error('Error fetching service camps:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post('/api/service-camps', async (req, res) => {
+  const camp = req.body;
+  if (!camp || !camp.id) {
+    return res.status(400).json({ success: false, error: 'Camp ID is required' });
+  }
+
+  try {
+    const client = getPool();
+    const query = `
+      INSERT INTO service_camps (
+        id, dealership_code, branch, mandal, village, camp_date,
+        target_tractors, supervisor, mechanic, status, service_type_expected,
+        offers, contact_person, contact_phone, notes, attended_count, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, NOW())
+      ON CONFLICT (id) DO UPDATE SET
+        dealership_code = EXCLUDED.dealership_code,
+        branch = EXCLUDED.branch,
+        mandal = EXCLUDED.mandal,
+        village = EXCLUDED.village,
+        camp_date = EXCLUDED.camp_date,
+        target_tractors = EXCLUDED.target_tractors,
+        supervisor = EXCLUDED.supervisor,
+        mechanic = EXCLUDED.mechanic,
+        status = EXCLUDED.status,
+        service_type_expected = EXCLUDED.service_type_expected,
+        offers = EXCLUDED.offers,
+        contact_person = EXCLUDED.contact_person,
+        contact_phone = EXCLUDED.contact_phone,
+        notes = EXCLUDED.notes,
+        attended_count = EXCLUDED.attended_count,
+        updated_at = NOW()
+      RETURNING *;
+    `;
+    const result = await client.query(query, [
+      camp.id,
+      camp.dealershipCode || camp.dealership_code || '',
+      camp.branch || '',
+      camp.mandal || '',
+      camp.village || '',
+      camp.campDate || camp.camp_date || '',
+      camp.targetTractors || camp.target_tractors || '',
+      camp.supervisor || '',
+      camp.mechanic || '',
+      camp.status || 'Upcoming',
+      camp.serviceTypeExpected || camp.service_type_expected || '',
+      camp.offers || '',
+      camp.contactPerson || camp.contact_person || '',
+      camp.contactPhone || camp.contact_phone || '',
+      camp.notes || '',
+      camp.attendedCount || camp.attended_count || '',
+      camp.createdAt || camp.created_at || new Date().toISOString()
+    ]);
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error: any) {
+    console.error('Error saving service camp:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.delete('/api/service-camps/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const client = getPool();
+    await client.query('DELETE FROM service_camps WHERE id = $1', [id]);
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Error deleting service camp:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post('/api/service-camps/bulk', async (req, res) => {
+  const { camps, replaceAll } = req.body;
+  if (!Array.isArray(camps)) {
+    return res.status(400).json({ success: false, error: 'Camps array required' });
+  }
+
+  const client = await getPool().connect();
+  try {
+    await client.query('BEGIN');
+    if (replaceAll) {
+      await client.query('DELETE FROM service_camps');
+    }
+
+    const query = `
+      INSERT INTO service_camps (
+        id, dealership_code, branch, mandal, village, camp_date,
+        target_tractors, supervisor, mechanic, status, service_type_expected,
+        offers, contact_person, contact_phone, notes, attended_count, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, NOW())
+      ON CONFLICT (id) DO UPDATE SET
+        dealership_code = EXCLUDED.dealership_code,
+        branch = EXCLUDED.branch,
+        mandal = EXCLUDED.mandal,
+        village = EXCLUDED.village,
+        camp_date = EXCLUDED.camp_date,
+        target_tractors = EXCLUDED.target_tractors,
+        supervisor = EXCLUDED.supervisor,
+        mechanic = EXCLUDED.mechanic,
+        status = EXCLUDED.status,
+        service_type_expected = EXCLUDED.service_type_expected,
+        offers = EXCLUDED.offers,
+        contact_person = EXCLUDED.contact_person,
+        contact_phone = EXCLUDED.contact_phone,
+        notes = EXCLUDED.notes,
+        attended_count = EXCLUDED.attended_count,
+        updated_at = NOW();
+    `;
+
+    for (const camp of camps) {
+      if (!camp.id) continue;
+      await client.query(query, [
+        camp.id,
+        camp.dealershipCode || camp.dealership_code || '',
+        camp.branch || '',
+        camp.mandal || '',
+        camp.village || '',
+        camp.campDate || camp.camp_date || '',
+        camp.targetTractors || camp.target_tractors || '',
+        camp.supervisor || '',
+        camp.mechanic || '',
+        camp.status || 'Upcoming',
+        camp.serviceTypeExpected || camp.service_type_expected || '',
+        camp.offers || '',
+        camp.contactPerson || camp.contact_person || '',
+        camp.contactPhone || camp.contact_phone || '',
+        camp.notes || '',
+        camp.attendedCount || camp.attended_count || '',
+        camp.createdAt || camp.created_at || new Date().toISOString()
+      ]);
+    }
+
+    await client.query('COMMIT');
+    res.json({ success: true, count: camps.length });
+  } catch (error: any) {
+    await client.query('ROLLBACK');
+    console.error('Error saving service camps bulk:', error);
+    res.status(500).json({ success: false, error: error.message });
+  } finally {
+    client.release();
+  }
+});
+
 // Full Master Backup JSON/Export endpoint
 app.get('/api/master-backup', async (req, res) => {
   try {
     const client = getPool();
-    const [custRes, sparesRes, jcRes, compRes, staffRes, attRes, setRes] = await Promise.all([
+    const [custRes, sparesRes, jcRes, compRes, staffRes, attRes, setRes, campRes] = await Promise.all([
       client.query('SELECT * FROM customers'),
       client.query('SELECT * FROM spares'),
       client.query('SELECT * FROM jobcards'),
@@ -1188,6 +1640,7 @@ app.get('/api/master-backup', async (req, res) => {
       client.query('SELECT * FROM staff'),
       client.query('SELECT * FROM staff_attendance'),
       client.query('SELECT * FROM app_settings'),
+      client.query('SELECT * FROM service_camps'),
     ]);
 
     res.json({
@@ -1198,7 +1651,8 @@ app.get('/api/master-backup', async (req, res) => {
       complaints: compRes.rows,
       staff: staffRes.rows,
       attendance: attRes.rows,
-      settings: setRes.rows
+      settings: setRes.rows,
+      serviceCamps: campRes.rows
     });
   } catch (error: any) {
     console.error('Error generating master backup:', error);
